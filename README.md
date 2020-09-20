@@ -1,0 +1,1 @@
+A platform to create, train, evaluate and explore neural networks from scratch.
