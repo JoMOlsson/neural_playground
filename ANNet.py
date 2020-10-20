@@ -58,6 +58,7 @@ class ANNet:
         self.gif_created = False             # Boolean variable if gif was ever created
         self.is_mnist = False                # Boolean variable stating if mnist data-set is used
         self.orig_images = []                # List holding the original images
+        self.orig_test_images = []           # List holding the original test images
 
     def init_network_params(self, network_size):
         """ Takes a list of integers and assigns it to the network_size class variable and creates the weight matrices
@@ -77,21 +78,26 @@ class ANNet:
         self.Theta = theta
         return theta
 
-    def create_gif(self):
+    @staticmethod
+    def create_gif():
         """ Will fetch all *.png files located under the temp folder and creates an animated gif to visualize the
             training sequence.
 
         :return:
         """
-        self.gif_created = True
         print("Creating gif ... ")
         cur_path = os.path.dirname(os.path.realpath(__file__))
         temp_path = os.path.join(cur_path, 'temp')
         image_directory = glob.glob(temp_path + '/*.png')
         images = []
+        i = 0
         for im_dir in image_directory:
-            images.append(Image.open(im_dir))
-        images[0].save('movie.gif', save_all=True, append_images=images, duration=30)
+            print(str(i/len(image_directory)))
+            if i < 1000:
+                images.append(Image.open(im_dir))
+            i += 1
+        print("Images loaded")
+        images[0].save('movie.gif', save_all=True, append_images=images)
 
     def set_network_architecture(self, network_architecture):
         """ Assigns the provided network_architecture variable to the internal class-variable self.network_architecture
@@ -117,6 +123,7 @@ class ANNet:
         test_labels = mnist.test_labels()
 
         self.orig_images = train_images
+        self.orig_test_images = test_images
 
         # Assign data
         self.set_train_data(train_images)
@@ -419,6 +426,34 @@ class ANNet:
                   " , accuracy: " + str(1 - num_of_errors/num_of_samples))
 
         if visualize_training:
+
+            # # ===== Dump data to json =====
+            picture_idx = random.randint(0, len(self.test_labels))
+            h_test, c_test, a_test, z_test = ANNet.forward_propagation(self, self.test_data[picture_idx, :],
+                                                                       self.test_labels[picture_idx])
+            picture = self.orig_test_images[picture_idx, :, :]
+
+            # create dump json file
+            cur_path = os.path.dirname(os.path.realpath(__file__))
+            data_path = os.path.join(cur_path, 'data_dump')
+
+            if not os.path.exists(data_path):
+                # Create dump folder
+                os.makedirs(data_path)
+            else:
+                # clean dump folder
+                for file in glob.glob(os.path.join(data_path, '*.npy')):
+                    os.remove(file)
+
+            # Dump data
+            data = {'picture': picture,
+                    'theta': self.Theta,
+                    'network_size': self.network_size,
+                    'a': a_test,
+                    'z': z_test,
+                    'prediction': h_test}
+            np.save(os.path.join(data_path, 'data.npy'), data)  # save to npy file
+
             # ----- Plot Cost/Accuracy progression -----
             plt.close()
             plt.plot(cost)
@@ -468,7 +503,6 @@ class ANNet:
         num_of_pics_n = 45
         tot_num_of_pics = num_of_pics_m * num_of_pics_n
         if self.is_mnist:
-
             picture_idx = random.sample(range(0, len(self.train_labels)), tot_num_of_pics)
 
         image_directory = []
@@ -780,7 +814,11 @@ class ANNet:
                     min_weight = min_v
 
         # Dynamically set the alpha values
-        alpha = [0.01, 0.5]
+        alpha = []
+        for iLayer, t in enumerate(theta):
+            num_of_weights = t.shape[0] * t.shape[1]
+            alpha.append((1 / num_of_weights) * 100)
+
         for iLayer, t in enumerate(theta):
             if iLayer == len(theta)-1:
                 output_layer = True
@@ -812,3 +850,4 @@ class ANNet:
 
         axs.set_xticks([])  # Delete x-ticks
         axs.set_yticks([])  # Delete y-ticks
+
