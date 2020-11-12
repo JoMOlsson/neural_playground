@@ -1,6 +1,6 @@
 *.png
-*.gif
 *venv/
 *.idea/
 *__pycache__/
 *temp*
+*data_dump/
