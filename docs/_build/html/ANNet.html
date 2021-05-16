@@ -1,0 +1,540 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>ANNet module &mdash; Neural_Playground 0.0.1 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="NN_classify module" href="NN_classify.html" />
+    <link rel="prev" title="neural_playground" href="modules.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home" alt="Documentation Home"> Neural_Playground
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="Neural_Playground.html">Neural_Playground</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">neural_playground</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">ANNet module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="NN_classify.html">NN_classify module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="blender_visualize_network.html">blender_visualize_network module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_generation.html">data_generation package</a></li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Neural_Playground</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="modules.html">neural_playground</a> &raquo;</li>
+        
+      <li>ANNet module</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/ANNet.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="module-ANNet">
+<span id="annet-module"></span><h1>ANNet module<a class="headerlink" href="#module-ANNet" title="Permalink to this headline">¶</a></h1>
+<dl class="py class">
+<dt id="ANNet.ANNet">
+<em class="property">class </em><code class="sig-prename descclassname">ANNet.</code><code class="sig-name descname">ANNet</code><a class="headerlink" href="#ANNet.ANNet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt id="ANNet.ANNet.append_with_zeros">
+<em class="property">static </em><code class="sig-name descname">append_with_zeros</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">num_of_digits</span></em>, <em class="sig-param"><span class="n">iteration</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.append_with_zeros" title="Permalink to this definition">¶</a></dt>
+<dd><p>Will give the file-name of the current iteration. The file will be named to enable natrual sorting even in
+a windows OS. For instance, if total number of digits == 3 and current iteration is 7 the file-name will be
+“007”</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_of_digits</strong> – (int) Total number of needed digits in the file-naming</p></li>
+<li><p><strong>iteration</strong> – (int) Current iteration</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return appended_name</dt>
+<dd class="field-even"><p>(str) File name</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.create_gif">
+<em class="property">static </em><code class="sig-name descname">create_gif</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.create_gif" title="Permalink to this definition">¶</a></dt>
+<dd><p>Will fetch all <a href="#id1"><span class="problematic" id="id2">*</span></a>.png files located under the temp folder and creates an animated gif to visualize the
+training sequence.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The method will dump a gif animation in a temp folder under the root directory</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.create_temp_folder">
+<em class="property">static </em><code class="sig-name descname">create_temp_folder</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.create_temp_folder" title="Permalink to this definition">¶</a></dt>
+<dd><p>The method will create a folder called temp in the current file-directory if it already does no exist. If
+the folder already exists it will flush it by deleting all .png files located in the folder.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return temp_folder</dt>
+<dd class="field-odd"><p>(str) path to temp folder</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.determine_number_of_digits">
+<em class="property">static </em><code class="sig-name descname">determine_number_of_digits</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">num_of_iterations</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.determine_number_of_digits" title="Permalink to this definition">¶</a></dt>
+<dd><p>Determines the number of digits needed in the image naming to hold all iterations. This is used to get the
+images naturally sorted based on name even in a windows file-explorer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>num_of_iterations</strong> – (int) Total number of iterations</p>
+</dd>
+<dt class="field-even">Return num_of_digits</dt>
+<dd class="field-even"><p>(int) Total number of needed digits in the file-naming</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.draw_and_predict">
+<code class="sig-name descname">draw_and_predict</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.draw_and_predict" title="Permalink to this definition">¶</a></dt>
+<dd><p>The method will randomly pick a sample in the test data-set and makes a prediction by doing a forward
+propagation using the current state of the neural network. If the network data is the mnist data-set
+the drawn sample will be visualised and the predicted value will be printed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.draw_network">
+<code class="sig-name descname">draw_network</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">theta</span></em>, <em class="sig-param"><span class="n">axs</span></em>, <em class="sig-param"><span class="n">max_weight</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">min_weight</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.draw_network" title="Permalink to this definition">¶</a></dt>
+<dd><p>The method will take list of weight matrices (npArray) and a plot axis and display the the network
+given by the weight matrices. If the max&amp;min weight values (float) are given, they will be used as
+max and min for the color scaling of the weight lines, otherwise the the method will use the max
+and min value in the weight matrices. This is used to enable absolute color scaling through
+a series of training iterations. The method will display all neurons, along with bias neurons as-well
+as the weight network between the neurons. The color of the neurons and the weights will be set by
+their individual values. The method will also display the sum of the network per layer to enable
+visualisation of changes in the network between iterations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>theta</strong> – (list)            List of weight matrices to be displayed</p></li>
+<li><p><strong>axs</strong> – (matplotlib axes) axis where the figure should be displayed</p></li>
+<li><p><strong>max_weight</strong> – (float)           maximum value used for color scaling</p></li>
+<li><p><strong>min_weight</strong> – (float)           minimum value used for color scaling</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.forward_propagation">
+<code class="sig-name descname">forward_propagation</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">y</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.forward_propagation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Will make predictions by forward propagate the provided input data x through the neural network stored in
+within the class. If the annotations (labels) are provided through the y-input variable, the cost (c) of the
+network will be calculated post the forward propagation using the least-square method. Else the cost will be
+set to None. Along with the predictions (h) per provided samples and the total cost (c), the method will
+return a list of all activation layers (a_list) and a list of all sigmoid layers (z_list)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – (npArray) Input data to be propagated through the neural network, Either one ore more samples.</p></li>
+<li><p><strong>y</strong> – (npArray) [optional] Annotations to be used to calculate the network cost</p></li>
+</ul>
+</dd>
+</dl>
+<p>:return h, (npArray) Prediction array
+c, (float) Network cost
+a_list, (list) List of all activation layers
+z_list: (list) List of sigmoid layers</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.init_network_params">
+<code class="sig-name descname">init_network_params</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">network_size</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.init_network_params" title="Permalink to this definition">¶</a></dt>
+<dd><p>Takes a list of integers and assigns it to the network_size class variable and creates the weight matrices
+(theta) corresponding to the network architecture. The weights of the artificial network will be initialized
+to random values in the interval (-self.epsilon, self.epsilon)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>network_size</strong> – (list)</p>
+</dd>
+<dt class="field-even">Return theta</dt>
+<dd class="field-even"><p>(list) List of npArrays containing the network weights</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.normalize_data">
+<code class="sig-name descname">normalize_data</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">data</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.normalize_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Takes the provided data and normalize it using the min and the max values of the data. If the min and max
+is already provided, the stored max/min value will be used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>data</strong> – (npArray) Numpy array corresponding to the data to be used within the neural network</p>
+</dd>
+<dt class="field-even">Return data</dt>
+<dd class="field-even"><p>(npArray) Normalized data</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.set_mnist_data">
+<code class="sig-name descname">set_mnist_data</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.set_mnist_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Imports the mnist data-set and assigns it to the train- &amp; test-data. The mnist data-set is an open source
+data set consisting of 60000 training images of hand-written digits. The method will also assign the
+internal class-variable self.is_mnist to true.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Sets mnists data to the class variables train_images, train_labels, test_images and test_labels</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.set_network_architecture">
+<code class="sig-name descname">set_network_architecture</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">network_architecture</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.set_network_architecture" title="Permalink to this definition">¶</a></dt>
+<dd><p>Assigns the provided network_architecture variable to the internal class-variable self.network_architecture</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>network_architecture</strong> – (list) List of integer corresponding to the desired size of the input layer,</p>
+</dd>
+</dl>
+<p>hidden layers and the output layer.
+:return: Assigns the network architecture to the internal variable of the class</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.set_test_data">
+<code class="sig-name descname">set_test_data</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">data</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.set_test_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Assigns the provided data to the test data-set. The data will be normalized using the normalize_data
+method. The method will also assign the class variables input_layer_size, num_of_train_samples, input_shape
+based on the properties of the provided data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>data</strong> – (npArray) Either a numpy array or list with test samples</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.set_test_labels">
+<code class="sig-name descname">set_test_labels</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">labels</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.set_test_labels" title="Permalink to this definition">¶</a></dt>
+<dd><p>Assigns the provided labels to the labels of the test data-set. The method will also set the
+class-variable output_layer_size based on the unique set of labels in the provided data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>labels</strong> – (npArray/list) Either a numpy array or list with labels corresponding to the true classifications</p>
+</dd>
+</dl>
+<p>of the training data-set
+:return:</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.set_train_data">
+<code class="sig-name descname">set_train_data</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">data</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.set_train_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Assigns the provided data to the training data-set. The data will be normalized using the normalize_data
+method. The method will also assign the class variables input_layer_size, num_of_train_samples, input_shape
+based on the properties of the provided data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>data</strong> – (npArray) Data to be set to the training data-set</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.set_train_labels">
+<code class="sig-name descname">set_train_labels</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">labels</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.set_train_labels" title="Permalink to this definition">¶</a></dt>
+<dd><p>Assigns the provided labels to the labels of the training data-set. The method will also set the
+class-variable output_layer_size based on the unique set of labels in the provided data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>labels</strong> – (npArray/list) Either a numpy array or list with labels corresponding to the true classifications</p>
+</dd>
+</dl>
+<p>of the training data-set
+:return:</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.train_network">
+<code class="sig-name descname">train_network</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">x</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">y</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">num_of_iterations</span><span class="o">=</span><span class="default_value">1000</span></em>, <em class="sig-param"><span class="n">visualize_training</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.train_network" title="Permalink to this definition">¶</a></dt>
+<dd><p>The method will initialize a training session with a number of training iterations determined by the
+variable num_of_iterations (int). The network will be trained using the x data as input data and the
+y data as the annotations. If x or y are not provided the input data and the annotation data will be
+set to the internal class-variables self.train_data and self.train_labels. The network is trained by
+forward propagating the input data and then back propagate the errors using gradient decent. If the
+boolean variable visualize_training is set to true, the training session will be visualized and the
+output will be stored in a temp-folder under the current directory path.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – (npArray)  Input data to be propagated through the network</p></li>
+<li><p><strong>y</strong> – (npArray)  Training labels used for calculating the network errors for
+back-propagation</p></li>
+<li><p><strong>num_of_iterations</strong> – (int)      Number of iterations to be executed in the training session</p></li>
+<li><p><strong>visualize_training</strong> – (boolean)  Boolean flag to indicate if the training session should be visualized</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="ANNet.ANNet.visualize_training">
+<code class="sig-name descname">visualize_training</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">cost</span></em>, <em class="sig-param"><span class="n">accuracy</span></em>, <em class="sig-param"><span class="n">historic_theta</span></em>, <em class="sig-param"><span class="n">historic_prediction</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.ANNet.visualize_training" title="Permalink to this definition">¶</a></dt>
+<dd><p>The method will visualize the training session in a (2x2) subplot displaying cost/accuracy, sample
+predictions and neural network for the whole training session. The output will be stored with .png
+files stored in a temp folder.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – (npArray) Training input data set</p></li>
+<li><p><strong>cost</strong> – (list)    List holding the cost values per iteration</p></li>
+<li><p><strong>accuracy</strong> – (list)    List holding the accuracy values per iteration</p></li>
+<li><p><strong>historic_theta</strong> – (list)    List holding all weight matrices per iteration</p></li>
+<li><p><strong>historic_prediction</strong> – (list)    List holding all predictions for every iteration</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt id="ANNet.sigmoid">
+<code class="sig-prename descclassname">ANNet.</code><code class="sig-name descname">sigmoid</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">z</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.sigmoid" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates the output of the sigmoid function from the provided z-data</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>z</strong> – (float, int, npArray) Input data</p>
+</dd>
+<dt class="field-even">Return g</dt>
+<dd class="field-even"><p>Output of sigmoid function</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt id="ANNet.sigmoid_gradient">
+<code class="sig-prename descclassname">ANNet.</code><code class="sig-name descname">sigmoid_gradient</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">z</span></em><span class="sig-paren">)</span><a class="headerlink" href="#ANNet.sigmoid_gradient" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates the output of the sigmoid derivative function from the provided z-data</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>z</strong> – (float, int, npArray) Input data</p>
+</dd>
+<dt class="field-even">Return g</dt>
+<dd class="field-even"><p>Output of sigmoid derivative function</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="NN_classify.html" class="btn btn-neutral float-right" title="NN_classify module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="modules.html" class="btn btn-neutral float-left" title="neural_playground" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2020, JoMOlsson
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
