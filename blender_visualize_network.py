@@ -114,7 +114,6 @@ def draw_neuron_layers(network_size, max_y, max_z, activations, layer_distance=2
                     activeObject = bpy.context.active_object  # Set active object to variable
                     mat = bpy.data.materials.new(name="MaterialName")  # set new material to variable
                     activeObject.data.materials.append(mat)  # add the material to the object
-                    # bpy.context.object.active_material.diffuse_color = (97/255, 164/255, 201/255, a)  # change color
                     bpy.context.object.active_material.diffuse_color = (c_rgb[0], c_rgb[1], c_rgb[2], 1)
                     z += dz
                     i_neuron += 1
@@ -205,5 +204,3 @@ if __name__ == '__main__':
     positions.append(input_positions)
     positions.extend(neuron_pos)
     positions.append(output_positions)
-    print("")
-
