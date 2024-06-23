@@ -1,8 +1,10 @@
+import os
 import matplotlib.pyplot as plt
 import random
 import math
 import numpy as np
-
+import json
+import random
 
 def create_circle(inner_radius, outer_radius, create_internal_circles=False):
     """ The method creates a 2-class data-set for training of a neural network. The data will will be in the form of
@@ -106,3 +108,62 @@ def visualize_data(data, label):
     plt.pause(0.001)
     plt.ion()
     plt.show()
+
+
+def load_and_parse_dql_data(data_dir: str, ratio: float = 0.5):
+    """ Loads and parses episodes from flappy bird games used for training a Deep Q-learning agent.
+
+        state:
+            y
+            vy
+            ay
+            uy
+            gap
+            dist
+    :param data_dir: (str) Pointer to location of episodes
+    :param ratio: (float) Frame ratio of every episode to be used
+    :return: states (np.array), next_states (np.array), rewards (np.array), actions (np.array)
+    """
+    # Get list of all episode files
+    # for every episode file, determine number of frames and select random frames equal to the ratio
+    # Extract state, next_state, reward, action from the selected frames
+
+    # Extract all Episode files
+    json_files = [file for file in os.listdir(data_dir) if file.endswith('.json') and 'episode' in file]
+
+    states = np.zeros((0, 6))    # State Matrix
+    n_states = np.zeros((0, 6))  # Next state Matrix
+    rewards = np.zeros((0, 1))   # Reward vector
+    actions = np.zeros((0, 1))   # Action vector
+    eog = np.zeros((0, 1))       # End of Game vector
+
+    for e_file in json_files:
+        file_dir = os.path.join(data_dir, e_file)
+        with open(file_dir, 'r') as jf:
+            data = json.load(jf)
+            nframes = len(data["states"])
+            nframes_to_extract = int(np.floor(nframes * ratio))
+            selected_frames = random.sample(range(nframes), nframes_to_extract)
+
+            for iFrame in selected_frames:
+                s = data["states"][iFrame]
+                f_state = np.array([s["Y"], s["vY"], s["aY"], s["distanceToPipe"], s["pipeGap"], s["upperY"]])
+                states = np.vstack([states, f_state])
+                actions = np.vstack([actions, np.array([s["action"]])])
+                rewards = np.vstack([rewards, np.array([s["reward"]])])
+
+                if iFrame >= nframes - 1:
+                    ns = data["states"][iFrame]
+                    eog = np.vstack([eog, np.array([True])])
+                else:
+                    ns = data["states"][iFrame + 1]
+                    eog = np.vstack([eog, np.array([False])])
+                n_state = np.array([ns["Y"], ns["vY"], ns["aY"], ns["distanceToPipe"], ns["pipeGap"], ns["upperY"]])
+                n_states = np.vstack([n_states, n_state])
+    return {"states": states.transpose(),
+            "n_states": n_states.transpose(),
+            "actions": actions.transpose(),
+            "rewards": rewards.transpose(),
+            "eog": eog.transpose()}
+
+    
