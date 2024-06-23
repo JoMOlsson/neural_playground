@@ -9,6 +9,21 @@ import copy
 import os
 import glob
 import random
+from enum import Enum
+from typing import Union
+
+
+class ActivationFunction(Enum):
+    SIGMOID = 1
+    RELU = 2
+    TANH = 3
+
+
+class Normalization(Enum):
+    MINMAX = 1
+    ZSCORE = 2
+    MINMAX_ALL = 3
+    MINMAX_OLD = 4
 
 
 def sigmoid(z):
@@ -33,7 +48,10 @@ def sigmoid_gradient(z):
 
 class ANNet:
 
-    def __init__(self):
+    def __init__(self, network_settings: dict = None):
+        if network_settings is not None:
+            self.set_network_settings(network_settings)
+
         self.default_hidden_layer_size = 15  # Default number of neurons in hidden layer
         self.epsilon = 0.12                  # Initialization value for weight matrices
         self.alpha = 1.0                     # Learning rate
@@ -59,6 +77,8 @@ class ANNet:
         self.is_mnist = False                # Boolean variable stating if mnist data-set is used
         self.orig_images = []                # List holding the original images
         self.orig_test_images = []           # List holding the original test images
+        self.activation_func = ActivationFunction["SIGMOID"]     # Activation function [DEFAULTS TO sigmoid)
+        self.norm_method = Normalization["MINMAX"]        # Normalization method
 
     def init_network_params(self, network_size):
         """ Takes a list of integers and assigns it to the network_size class variable and creates the weight matrices
@@ -77,6 +97,20 @@ class ANNet:
             theta.extend(t)
         self.Theta = theta
         return theta
+
+    def set_activation_function(self, activation_function: Union[int, str]):
+        if isinstance(activation_function, int):
+            try:
+                self.activation_func = ActivationFunction(activation_function)
+            except ValueError:
+                raise ValueError(f"Integer {activation_function} is not a valid value for Activation Function")
+        elif isinstance(activation_function, str):
+            try:
+                self.activation_func = ActivationFunction[activation_function.upper()]
+            except KeyError:
+                raise ValueError(f"String '{activation_function}' is not a valid activation function")
+        else:
+            raise TypeError("Input must be an integer or a string")
 
     @staticmethod
     def create_gif():
@@ -99,7 +133,21 @@ class ANNet:
         print("Images loaded")
         images[0].save('movie.gif', save_all=True, append_images=images)
 
-    def set_network_architecture(self, network_architecture):
+    def set_normalization_method(self, norm_method: Union[int, str]):
+        if isinstance(norm_method, int):
+            try:
+                self.norm_method = Normalization(norm_method)
+            except ValueError:
+                raise ValueError(f"Integer {norm_method} is not a valid value for Activation Function")
+        elif isinstance(norm_method, str):
+            try:
+                self.norm_method = Normalization[norm_method.upper()]
+            except KeyError:
+                raise ValueError(f"String '{norm_method}' is not a valid activation function")
+        else:
+            raise TypeError("Input must be an integer or a string")
+
+    def set_network_architecture(self, network_architecture: list):
         """ Assigns the provided network_architecture variable to the internal class-variable self.network_architecture
 
         :param network_architecture: (list) List of integer corresponding to the desired size of the input layer,
@@ -132,43 +180,112 @@ class ANNet:
         self.set_test_labels(test_labels)
         self.is_mnist = True
 
-    def normalize_data(self, data):
+    def normalize_data(self, data, data_axis: int = None):
         """ Takes the provided data and normalize it using the min and the max values of the data. If the min and max
             is already provided, the stored max/min value will be used.
 
         :param data:  (npArray) Numpy array corresponding to the data to be used within the neural network
+        :param data_axis: (int) Determines which axis should be considered to be the data axis
         :return data: (npArray) Normalized data
         """
         data = np.array(data)
         data = data.astype('float64')
-        # Assign mean and var vector if not available
+
+        # Set data and feature axis
+        if data_axis is None:
+            if data.shape[0] > data.shape[1]:
+                data_axis = 0
+                feat_axis = 1
+            else:
+                data_axis = 1
+                feat_axis = 0
+        else:
+            feat_axis = 1
+
+        # Assign mean per feature
         if 'self.feature_mean_vector' not in locals():
             feature_mean_vector = []
-            for iFeat in range(0, data.shape[1]):
+            for iFeat in range(0, data.shape[feat_axis]):
                 feature_mean_vector.append(np.mean(data[:, iFeat]))
             self.feature_mean_vector = feature_mean_vector
+
+        # Extract variance per feature
         if 'self.feature_var_vector' not in locals():
             feature_var_vector = []
-            for iFeat in range(0, data.shape[1]):
-                feature_var_vector.append(np.var(data[:, iFeat]))
+            for iFeat in range(0, data.shape[feat_axis]):
+                d = data[:, iFeat]
+                feature_var_vector.append(np.var(d))
             self.feature_var_vector = feature_var_vector
+
+        # Extract min values per feature
         if 'self.feature_min_vector' not in locals():
             self.data_min = np.min(np.min(data))
             feature_min_vector = []
-            for iFeat in range(0, data.shape[1]):
+            for iFeat in range(0, data.shape[feat_axis]):
                 feature_min_vector.append(np.min(data[:, iFeat]))
             self.feature_min_vector = feature_min_vector
+
+        # Extract max values per feature
         if 'self.feature_max_vector' not in locals():
             self.data_max = np.max(np.max(data))
             feature_max_vector = []
-            for iFeat in range(0, data.shape[1]):
+            for iFeat in range(0, data.shape[feat_axis]):
                 feature_max_vector.append(np.max(data[:, iFeat]))
             self.feature_max_vector = feature_max_vector
+
         # ----- Normalize data -----
+        if self.norm_method == Normalization["MINMAX"]:
+            for iFeat in range(0, data.shape[feat_axis]):
+                d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
+                d_norm = ((2 * (d - self.feature_min_vector[iFeat])) /
+                          (self.feature_max_vector[iFeat] - self.feature_min_vector[iFeat]) - 1)
+
+                if feat_axis:
+                    data[:, iFeat] = d_norm
+                else:
+                    data[iFeat, :] = d_norm
+        elif self.norm_method == Normalization["ZSCORE"]:
+            for iFeat in range(0, data.shape[feat_axis]):
+                d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
+                d_norm = (d - self.feature_mean_vector[iFeat]) / self.feature_var_vector[iFeat]
+
+                if feat_axis:
+                    data[:, iFeat] = d_norm
+                else:
+                    data[iFeat, :] = d_norm
+        elif self.norm_method == Normalization["MINMAX_ALL"]:
+            for iFeat in range(0, data.shape[0]):
+                d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
+                d_norm = (2*(d - self.data_min)) / (self.data_max - self.data_min) - 1
+
+                if feat_axis:
+                    data[:, iFeat] = d_norm
+                else:
+                    data[iFeat, :] = d_norm
+        elif self.norm_method == Normalization["MINMAX_OLD"]:
+            for iData in range(0, data.shape[0]):
+                d = np.array(data[iData, :])
+                d_norm = (2*(d - self.data_min)) / (self.data_max - self.data_min) - 1
+                data[iData, :] = d_norm
+
+        return data
+
+    def reverse_normalization(self, data):
+        """ Takes the provided data and un-normalizes it using the min and the max values of the data.
+
+        TODO - IMPLEMENT FOR ALL NORMALIZATION METHODS
+
+        :param data:  (npArray) Numpy array corresponding to the data to be used within the neural network
+        :return data: (npArray) Un-Normalized data
+        """
+        data = np.array(data)
+        data = data.astype('float64')
+
+        # ----- Reverse Normalize data -----
         for iData in range(0, data.shape[0]):
             d = np.array(data[iData, :])
-            d_norm = (2*(d - self.data_min)) / (self.data_max - self.data_min) - 1
-            data[iData, :] = d_norm
+            d_unnorm = ((d + 1) * (self.data_max - self.data_min)) / 2 + self.data_min
+            data[iData, :] = d_unnorm
         return data
 
     def set_train_data(self, data):
@@ -248,7 +365,7 @@ class ANNet:
             set to None. Along with the predictions (h) per provided samples and the total cost (c), the method will
             return a list of all activation layers (a_list) and a list of all sigmoid layers (z_list)
 
-        :param x:  (npArray) Input data to be propagated through the neural network, Either one ore more samples.
+        :param x:  (npArray) Input data to be propagated through the neural network, Either one or more samples.
         :param y:  (npArray) [optional] Annotations to be used to calculate the network cost
 
         :return h, (npArray)   Prediction array
@@ -320,6 +437,63 @@ class ANNet:
         im = x.reshape(self.input_shape[0], self.input_shape[1])
         plt.imshow(im)
         plt.show()
+
+    def init_weights(self):
+        # Initialize weights if they have not been initialized by user.
+        if not self.Theta:
+            if self.network_architecture is None:
+                print("Network weights has not been initialized by user!, default hidden layer  of size " +
+                      str(self.default_hidden_layer_size) + " has been applied")
+                input_layer_size = self.input_layer_size
+                output_layer_size = self.output_layer_size
+                network_architecture = [input_layer_size, self.default_hidden_layer_size, output_layer_size]
+                self.network_architecture = network_architecture
+            self.init_network_params(self.network_architecture)
+
+    def set_network_settings(self, settings: dict):
+        if "normalization_method" in settings.keys():
+            self.set_normalization_method(settings["normalization_method"])
+
+        if "activation_function" in settings.keys():
+            self.set_activation_function(settings["activation_function"])
+
+        if "network_architecture" in settings.keys():
+            self.set_network_architecture(settings["network_architecture"])
+
+    def back_propagation(self, delta, z_mat, a_mat):
+        lr = (1 / len(delta))
+
+        # Init weight gradient matrices
+        theta_grad = []
+        for iLayer, theta in enumerate(self.Theta):
+            theta = theta.reshape(self.network_size[iLayer] + 1, self.network_size[iLayer + 1])
+            theta_grad.append(np.zeros(theta.shape))
+
+        for iLayer in range(len(a_mat) - 1, -1, -1):
+            z = z_mat[iLayer]
+            if not iLayer == len(a_mat) - 1:
+                index = iLayer + 1
+                theta = self.Theta[index]
+                t = theta.reshape(self.network_size[index] + 1, self.network_size[index + 1])
+                t = t[1:, :]
+
+                delta_weight = np.dot(t, delta.T)
+                sig_z = sigmoid_gradient(z)
+                delta = delta_weight * sig_z.T
+                delta = delta.T
+            else:
+                delta = delta * sigmoid_gradient(z)
+
+            a = a_mat[iLayer]
+            th_grad = np.dot(a.T, delta)
+            theta_grad[iLayer] += th_grad
+
+        # Update weights from the weight gradients
+        for i, theta_val in enumerate(theta_grad):
+            theta_grad[i] = lr * theta_val
+            t = self.alpha * theta_grad[i]
+            tf = t.flatten()
+            self.Theta[i] -= tf
 
     def train_network(self, x=None, y=None, num_of_iterations=1000, visualize_training=True):
         """ The method will initialize a training session with a number of training iterations determined by the
