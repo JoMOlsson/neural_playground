@@ -5,7 +5,6 @@ A platform for deep-learning written from scratch used for constructing, trainin
 
 ![rendered_network](/assets/rendered_network.gif)
 ![rendered_network](/assets/training.gif)
-![rendered_network](/assets/training_xy.gif)
 
 The user specifies the desired network architecture and feeds it with arbitrary data-sets for training and validation. The project also supports visualization of the training session and rendering of the resulting networks with support of graphical rendering in blender. 
 
@@ -25,3 +24,5 @@ Theta = n_net.init_network_params(network_architecture)
 n_net.train_network(num_of_iterations=2000)
 
 ```
+
+![rendered_network](/assets/training_xy.gif)
