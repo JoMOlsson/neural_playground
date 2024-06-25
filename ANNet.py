@@ -11,12 +11,7 @@ import glob
 import random
 from enum import Enum
 from typing import Union
-
-
-class ActivationFunction(Enum):
-    SIGMOID = 1
-    RELU = 2
-    TANH = 3
+from utils.activation import activate, gradient, ActivationFunction
 
 
 class Normalization(Enum):
@@ -31,51 +26,15 @@ class Initialization(Enum):
     HE = 2
 
 
-def sigmoid(z):
-    """ Calculates the output of the sigmoid function from the provided z-data
-
-    :param z: (float, int, npArray) Input data
-    :return g: Output of sigmoid function
-    """
-    g = 1 / (1 + e**(-z))
-    return g
-
-
-def sigmoid_gradient(z):
-    """ Calculates the output of the sigmoid derivative function from the provided z-data
-
-    :param z: (float, int, npArray) Input data
-    :return g: Output of sigmoid derivative function
-    """
-    g = sigmoid(z)*(1 - sigmoid(z))
-    return g
-
-
-def relu(z):
-    """ Calculates the output of the ReLU function from the provided z-data
-
-    :param z: (float, int, npArray) Input data
-    :return g: Output of ReLU function
-    """
-    g = np.maximum(0, z)
-    return g
-
-
-def relu_gradient(z):
-    """ Calculates the output of the ReLU derivative function from the provided z-data
-
-    :param z: (float, int, npArray) Input data
-    :return g: Output of ReLU derivative function
-    """
-    g = np.where(z > 0, 1, 0)
-    return g
-
-
 class ANNet:
     def __init__(self, network_settings: dict = None):
         self.activation_func = ActivationFunction["SIGMOID"]     # Activation function [DEFAULTS TO sigmoid)
         self.norm_method = Normalization["MINMAX"]        # Normalization method
         self.init_method = Initialization["EPSILON"]      # Init method
+
+        #self.activation_func = ActivationFunction["RELU"]     # Activation function [DEFAULTS TO sigmoid)
+        #self.norm_method = Normalization["MINMAX"]        # Normalization method
+        #self.init_method = Initialization["HE"]      # Init method
 
         if network_settings is not None:
             self.set_network_settings(network_settings)
@@ -118,7 +77,7 @@ class ANNet:
         theta = []
         self.network_size = network_size
 
-        if self.init_method == Initialization["EPSILON"]:
+        if self.init_method == Initialization.EPSILON:
             for i in range(0, len(network_size)-1):
                 n = (network_size[i]+1) * network_size[i+1]
                 t = np.random.uniform(-self.epsilon, self.epsilon, size=(1, n))
@@ -184,19 +143,27 @@ class ANNet:
 
         :return:
         """
+
+        def extract_number(filename):
+            return int(filename.split('/')[-1].split('.')[0])  # Assuming Unix-like path separator '/'
+
         print("Creating gif ... ")
         cur_path = os.path.dirname(os.path.realpath(__file__))
         temp_path = os.path.join(cur_path, 'temp')
         image_directory = glob.glob(temp_path + '/*.png')
+
+        # Sort image paths based on numeric part of filename
+        image_directory_sorted = sorted(image_directory, key=extract_number)
+
         images = []
         i = 0
-        for im_dir in image_directory:
+        for im_dir in image_directory_sorted:
             print(str(i/len(image_directory)))
             if i < 1000:
                 images.append(Image.open(im_dir))
             i += 1
         print("Images loaded")
-        images[0].save('movie.gif', save_all=True, append_images=images)
+        images[0].save('movie.gif', save_all=True, append_images=images, duration=50)
 
     def set_network_architecture(self, network_architecture: list):
         """ Assigns the provided network_architecture variable to the internal class-variable self.network_architecture
@@ -285,7 +252,7 @@ class ANNet:
             self.feature_max_vector = feature_max_vector
 
         # ----- Normalize data -----
-        if self.norm_method == Normalization["MINMAX"]:
+        if self.norm_method == Normalization.MINMAX:
             for iFeat in range(0, data.shape[feat_axis]):
                 d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
                 d_norm = ((2 * (d - self.feature_min_vector[iFeat])) /
@@ -295,7 +262,7 @@ class ANNet:
                     data[:, iFeat] = d_norm
                 else:
                     data[iFeat, :] = d_norm
-        elif self.norm_method == Normalization["ZSCORE"]:
+        elif self.norm_method == Normalization.ZSCORE:
             for iFeat in range(0, data.shape[feat_axis]):
                 d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
                 d_norm = (d - self.feature_mean_vector[iFeat]) / self.feature_var_vector[iFeat]
@@ -304,7 +271,7 @@ class ANNet:
                     data[:, iFeat] = d_norm
                 else:
                     data[iFeat, :] = d_norm
-        elif self.norm_method == Normalization["MINMAX_ALL"]:
+        elif self.norm_method == Normalization.MINMAX_ALL:
             for iFeat in range(0, data.shape[0]):
                 d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
                 d_norm = (2*(d - self.data_min)) / (self.data_max - self.data_min) - 1
@@ -313,7 +280,7 @@ class ANNet:
                     data[:, iFeat] = d_norm
                 else:
                     data[iFeat, :] = d_norm
-        elif self.norm_method == Normalization["MINMAX_OLD"]:
+        elif self.norm_method == Normalization.MINMAX_OLD:
             for iData in range(0, data.shape[0]):
                 d = np.array(data[iData, :])
                 d_norm = (2*(d - self.data_min)) / (self.data_max - self.data_min) - 1
@@ -443,7 +410,7 @@ class ANNet:
 
             z = np.matmul(a, t)  # z = a*t
             z_list.append(z)     # Store the sigmoid values
-            a = sigmoid(z)       # Calculate the activation layer
+            a = activate(self.activation_func, z)       # Calculate the activation layer
 
             # add bias unit
             if num_of_samples > 1:
@@ -532,11 +499,11 @@ class ANNet:
                 t = t[1:, :]
 
                 delta_weight = np.dot(t, delta.T)
-                sig_z = sigmoid_gradient(z)
+                sig_z = gradient(self.activation_func, z)
                 delta = delta_weight * sig_z.T
                 delta = delta.T
             else:
-                delta = delta * sigmoid_gradient(z)
+                delta = delta * gradient(self.activation_func, z)
 
             a = a_mat[iLayer]
             th_grad = np.dot(a.T, delta)
@@ -615,11 +582,11 @@ class ANNet:
                     t = t[1:, :]
 
                     delta_weight = np.dot(t, delta.T)
-                    sig_z = sigmoid_gradient(z)
+                    sig_z = gradient(self.activation_func, z)
                     delta = delta_weight * sig_z.T
                     delta = delta.T
                 else:
-                    delta = delta * sigmoid_gradient(z)
+                    delta = delta * gradient(self.activation_func, z)
 
                 a = a_mat[iLayer]
                 th_grad = np.dot(a.T, delta)
@@ -656,10 +623,11 @@ class ANNet:
         if visualize_training:
 
             # # ===== Dump data to json =====
-            picture_idx = random.randint(0, len(self.test_labels))
-            h_test, c_test, a_test, z_test = ANNet.forward_propagation(self, self.test_data[picture_idx, :],
-                                                                       self.test_labels[picture_idx])
-            picture = self.orig_test_images[picture_idx, :, :]
+            if self.is_mnist:
+                picture_idx = random.randint(0, len(self.test_labels))
+                h_test, c_test, a_test, z_test = ANNet.forward_propagation(self, self.test_data[picture_idx, :],
+                                                                           self.test_labels[picture_idx])
+                picture = self.orig_test_images[picture_idx, :, :]
 
             # create dump json file
             cur_path = os.path.dirname(os.path.realpath(__file__))
@@ -674,13 +642,14 @@ class ANNet:
                     os.remove(file)
 
             # Dump data
-            data = {'picture': picture,
-                    'theta': self.Theta,
-                    'network_size': self.network_size,
-                    'a': a_test,
-                    'z': z_test,
-                    'prediction': h_test}
-            np.save(os.path.join(data_path, 'data.npy'), data)  # save to npy file
+            if self.is_mnist:
+                data = {'picture': picture,
+                        'theta': self.Theta,
+                        'network_size': self.network_size,
+                        'a': a_test,
+                        'z': z_test,
+                        'prediction': h_test}
+                np.save(os.path.join(data_path, 'data.npy'), data)  # save to npy file
 
             # ----- Plot Cost/Accuracy progression -----
             plt.close()
@@ -707,7 +676,8 @@ class ANNet:
 
         fig, axs = plt.subplots(2, 2)
         mng = plt.get_current_fig_manager()
-        mng.window.state('zoomed')
+        mng.full_screen_toggle()
+        # mng.window.state('zoomed')
         temp_folder = self.create_temp_folder()  # Create a temp-folder to store the training visualisation content
 
         # Extract min/max weight
@@ -735,7 +705,18 @@ class ANNet:
 
         image_directory = []
         num_of_digits = self.determine_number_of_digits(len(historic_prediction))
-        for iteration in range(0, len(historic_prediction)):
+
+        n_start = 0
+        n_end = len(historic_prediction)
+        ask_user = True
+        if ask_user:
+            try:
+                n_start = int(input("Select starting index for rendering"))
+                n_end = int(input("Select ending index for rendering"))
+            except ValueError:
+                print("Provided input is not valid, only integers.")
+
+        for iteration in range(n_start, n_end):
             title_str = 'Cost: ' + str(cost[iteration]) + ' , Accuracy: ' + str(accuracy[iteration]) + \
                         ' , Iteration: ' + str(iteration)
             fig.suptitle(title_str)
@@ -840,6 +821,7 @@ class ANNet:
                 axs[0, 1].set_yticks([])
 
             # ----- Network plot [1, 1]-----
+            # if self.is_mnist:
             if absolute_weight:
                 self.draw_network(historic_theta[iteration], axs[1, 1], max_weight, min_weight)
             else:
@@ -1045,7 +1027,10 @@ class ANNet:
         alpha = []
         for iLayer, t in enumerate(theta):
             num_of_weights = t.shape[0] * t.shape[1]
-            alpha.append((1 / num_of_weights) * 100)
+            alp = (1 / num_of_weights) * 100
+            alp = max([0, alp])
+            alp = min([1, alp])
+            alpha.append(alp)
 
         for iLayer, t in enumerate(theta):
             if iLayer == len(theta)-1:
@@ -1078,4 +1063,3 @@ class ANNet:
 
         axs.set_xticks([])  # Delete x-ticks
         axs.set_yticks([])  # Delete y-ticks
-
