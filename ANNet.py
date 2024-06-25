@@ -26,6 +26,11 @@ class Normalization(Enum):
     MINMAX_OLD = 4
 
 
+class Initialization(Enum):
+    EPSILON = 1
+    HE = 2
+
+
 def sigmoid(z):
     """ Calculates the output of the sigmoid function from the provided z-data
 
@@ -46,15 +51,38 @@ def sigmoid_gradient(z):
     return g
 
 
-class ANNet:
+def relu(z):
+    """ Calculates the output of the ReLU function from the provided z-data
 
+    :param z: (float, int, npArray) Input data
+    :return g: Output of ReLU function
+    """
+    g = np.maximum(0, z)
+    return g
+
+
+def relu_gradient(z):
+    """ Calculates the output of the ReLU derivative function from the provided z-data
+
+    :param z: (float, int, npArray) Input data
+    :return g: Output of ReLU derivative function
+    """
+    g = np.where(z > 0, 1, 0)
+    return g
+
+
+class ANNet:
     def __init__(self, network_settings: dict = None):
+        self.activation_func = ActivationFunction["SIGMOID"]     # Activation function [DEFAULTS TO sigmoid)
+        self.norm_method = Normalization["MINMAX"]        # Normalization method
+        self.init_method = Initialization["EPSILON"]      # Init method
+
         if network_settings is not None:
             self.set_network_settings(network_settings)
 
         self.default_hidden_layer_size = 15  # Default number of neurons in hidden layer
         self.epsilon = 0.12                  # Initialization value for weight matrices
-        self.alpha = 1.0                     # Learning rate
+        self.alpha = 1                       # Learning rate
         self.network_size = []               # Default network size
         self.Theta = []                      # Holding weight matrices
         self.feature_mean_vector = []        # (list) average values in data per feature
@@ -77,8 +105,6 @@ class ANNet:
         self.is_mnist = False                # Boolean variable stating if mnist data-set is used
         self.orig_images = []                # List holding the original images
         self.orig_test_images = []           # List holding the original test images
-        self.activation_func = ActivationFunction["SIGMOID"]     # Activation function [DEFAULTS TO sigmoid)
-        self.norm_method = Normalization["MINMAX"]        # Normalization method
 
     def init_network_params(self, network_size):
         """ Takes a list of integers and assigns it to the network_size class variable and creates the weight matrices
@@ -91,11 +117,22 @@ class ANNet:
 
         theta = []
         self.network_size = network_size
-        for i in range(0, len(network_size)-1):
-            n = (network_size[i]+1) * network_size[i+1]
-            t = np.random.uniform(-self.epsilon, self.epsilon, size=(1, n))
-            theta.extend(t)
-        self.Theta = theta
+
+        if self.init_method == Initialization["EPSILON"]:
+            for i in range(0, len(network_size)-1):
+                n = (network_size[i]+1) * network_size[i+1]
+                t = np.random.uniform(-self.epsilon, self.epsilon, size=(1, n))
+                theta.extend(t)
+            self.Theta = theta
+        else:
+            for i in range(len(self.network_size) - 1):
+                n = (network_size[i] + 1) * network_size[i + 1]
+                input_size = self.network_size[i]
+
+                # He initialization
+                t = np.random.randn(1, n) * np.sqrt(2.0 / input_size)
+                theta.append(t)
+            self.Theta = theta
         return theta
 
     def set_activation_function(self, activation_function: Union[int, str]):
@@ -109,6 +146,34 @@ class ANNet:
                 self.activation_func = ActivationFunction[activation_function.upper()]
             except KeyError:
                 raise ValueError(f"String '{activation_function}' is not a valid activation function")
+        else:
+            raise TypeError("Input must be an integer or a string")
+
+    def set_init_function(self, init: Union[int, str]):
+        if isinstance(init, int):
+            try:
+                self.init_method = Initialization(init)
+            except ValueError:
+                raise ValueError(f"Integer {init} is not a valid value for Init Function")
+        elif isinstance(init, str):
+            try:
+                self.init_method = Initialization[init.upper()]
+            except KeyError:
+                raise ValueError(f"String '{init}' is not a valid Init function")
+        else:
+            raise TypeError("Input must be an integer or a string")
+
+    def set_normalization_method(self, norm_method: Union[int, str]):
+        if isinstance(norm_method, int):
+            try:
+                self.norm_method = Normalization(norm_method)
+            except ValueError:
+                raise ValueError(f"Integer {norm_method} is not a valid value for Activation Function")
+        elif isinstance(norm_method, str):
+            try:
+                self.norm_method = Normalization[norm_method.upper()]
+            except KeyError:
+                raise ValueError(f"String '{norm_method}' is not a valid activation function")
         else:
             raise TypeError("Input must be an integer or a string")
 
@@ -132,20 +197,6 @@ class ANNet:
             i += 1
         print("Images loaded")
         images[0].save('movie.gif', save_all=True, append_images=images)
-
-    def set_normalization_method(self, norm_method: Union[int, str]):
-        if isinstance(norm_method, int):
-            try:
-                self.norm_method = Normalization(norm_method)
-            except ValueError:
-                raise ValueError(f"Integer {norm_method} is not a valid value for Activation Function")
-        elif isinstance(norm_method, str):
-            try:
-                self.norm_method = Normalization[norm_method.upper()]
-            except KeyError:
-                raise ValueError(f"String '{norm_method}' is not a valid activation function")
-        else:
-            raise TypeError("Input must be an integer or a string")
 
     def set_network_architecture(self, network_architecture: list):
         """ Assigns the provided network_architecture variable to the internal class-variable self.network_architecture
@@ -459,6 +510,9 @@ class ANNet:
 
         if "network_architecture" in settings.keys():
             self.set_network_architecture(settings["network_architecture"])
+
+        if "init_method" in settings.keys():
+            self.set_init_function(settings["init_method"])
 
     def back_propagation(self, delta, z_mat, a_mat):
         lr = (1 / len(delta))
