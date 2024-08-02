@@ -110,7 +110,13 @@ def visualize_data(data, label):
     plt.show()
 
 
-def load_and_parse_dql_data(data_dir: str, ratio: float = 0.5):
+def get_xor_data():
+    data = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+    labels = np.array([0, 1, 1, 0])
+    return data, labels
+
+
+def load_and_parse_dql_data(data_dir: str, ratio: float = 1.0):
     """ Loads and parses episodes from flappy bird games used for training a Deep Q-learning agent.
 
         state:
@@ -131,8 +137,8 @@ def load_and_parse_dql_data(data_dir: str, ratio: float = 0.5):
     # Extract all Episode files
     json_files = [file for file in os.listdir(data_dir) if file.endswith('.json') and 'episode' in file]
 
-    states = np.zeros((0, 6))    # State Matrix
-    n_states = np.zeros((0, 6))  # Next state Matrix
+    states = np.zeros((0, 3))    # State Matrix
+    n_states = np.zeros((0, 3))  # Next state Matrix
     rewards = np.zeros((0, 1))   # Reward vector
     actions = np.zeros((0, 1))   # Action vector
     eog = np.zeros((0, 1))       # End of Game vector
@@ -147,7 +153,10 @@ def load_and_parse_dql_data(data_dir: str, ratio: float = 0.5):
 
             for iFrame in selected_frames:
                 s = data["states"][iFrame]
-                f_state = np.array([s["Y"], s["vY"], s["aY"], s["distanceToPipe"], s["pipeGap"], s["upperY"]])
+                # f_state = np.array([s["Y"], s["vY"], s["distanceToPipe"], s["pipeGap"], s["upperY"]])
+                vert_dist = s["Y"] - (s["upperY"] + s["pipeGap"] / 2)
+                f_state = np.array([vert_dist, s["vY"], s["distanceToPipe"]])
+                # vertDistanceToPipe = std::abs(state.p_Y - (state.p_upperY + state.p_pipeGap / 2));
                 states = np.vstack([states, f_state])
                 actions = np.vstack([actions, np.array([s["action"]])])
                 rewards = np.vstack([rewards, np.array([s["reward"]])])
@@ -158,7 +167,9 @@ def load_and_parse_dql_data(data_dir: str, ratio: float = 0.5):
                 else:
                     ns = data["states"][iFrame + 1]
                     eog = np.vstack([eog, np.array([False])])
-                n_state = np.array([ns["Y"], ns["vY"], ns["aY"], ns["distanceToPipe"], ns["pipeGap"], ns["upperY"]])
+                # n_state = np.array([ns["Y"], ns["vY"], ns["aY"], ns["distanceToPipe"], ns["pipeGap"], ns["upperY"]])
+                n_vert_dist = s["next_Y"] - (s["next_upperY"] + s["next_pipeGap"] / 2)
+                n_state = np.array([n_vert_dist, s["next_vY"], s["next_distanceToPipe"]])
                 n_states = np.vstack([n_states, n_state])
     return {"states": states.transpose(),
             "n_states": n_states.transpose(),
