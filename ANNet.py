@@ -1,5 +1,4 @@
 import numpy as np
-from math import e
 import matplotlib.pyplot as plt
 import mnist
 import math
@@ -11,7 +10,17 @@ import glob
 import random
 from enum import Enum
 from typing import Union
-from utils.activation import activate, gradient, ActivationFunction
+
+from .utils.activation import activate, gradient, ActivationFunction
+from .opimizer.adam import AdamOptimizer
+
+# TODO - CLEAN UP CODE
+# TODO - Move normalization
+# TODO - CHECK HOW TO SET SETTINGS CONVININTLY
+# TODO - MOVE VISUALIZATION
+# TODO - RE WRITE TRAINING AND REMOVE DEPRICATED
+# TODO - ADD SAVE METHOD
+# TODO - ADD LOAD METHOD
 
 
 class Normalization(Enum):
@@ -28,22 +37,12 @@ class Initialization(Enum):
 
 class ANNet:
     def __init__(self, network_settings: dict = None):
-        self.activation_func = ActivationFunction["SIGMOID"]     # Activation function [DEFAULTS TO sigmoid)
-        self.norm_method = Normalization["MINMAX"]        # Normalization method
-        self.init_method = Initialization["EPSILON"]      # Init method
-
-        #self.activation_func = ActivationFunction["RELU"]     # Activation function [DEFAULTS TO sigmoid)
-        #self.norm_method = Normalization["MINMAX"]        # Normalization method
-        #self.init_method = Initialization["HE"]      # Init method
-
-        if network_settings is not None:
-            self.set_network_settings(network_settings)
-
         self.default_hidden_layer_size = 15  # Default number of neurons in hidden layer
         self.epsilon = 0.12                  # Initialization value for weight matrices
-        self.alpha = 1                       # Learning rate
+        self.alpha = 10                       # Learning rate
         self.network_size = []               # Default network size
         self.Theta = []                      # Holding weight matrices
+        self.weight = []
         self.feature_mean_vector = []        # (list) average values in data per feature
         self.feature_var_vector = []         # (list) variance values in data per feature
         self.data_min = None                 # (float) min value in input data
@@ -65,6 +64,21 @@ class ANNet:
         self.orig_images = []                # List holding the original images
         self.orig_test_images = []           # List holding the original test images
 
+        self.activation_func = ActivationFunction.SIGMOID     # Activation function [DEFAULTS TO sigmoid)
+        self.norm_method = Normalization.ZSCORE            # Normalization method
+        self.init_method = Initialization.HE               # Init method
+        self.output_func = self.activation_func
+
+        if network_settings is not None:
+            self.set_network_settings(network_settings)
+
+        self.optimizer = AdamOptimizer(self.Theta, learning_rate=self.alpha)
+        self.use_optimizer = True
+
+    def set_alpha(self, alpha):
+        self.alpha = alpha
+        self.optimizer.learning_rate = alpha
+
     def init_network_params(self, network_size):
         """ Takes a list of integers and assigns it to the network_size class variable and creates the weight matrices
             (theta) corresponding to the network architecture. The weights of the artificial network will be initialized
@@ -76,6 +90,8 @@ class ANNet:
 
         theta = []
         self.network_size = network_size
+        weight = []
+        bias = []
 
         if self.init_method == Initialization.EPSILON:
             for i in range(0, len(network_size)-1):
@@ -91,7 +107,31 @@ class ANNet:
                 # He initialization
                 t = np.random.randn(1, n) * np.sqrt(2.0 / input_size)
                 theta.append(t)
+
+                w = np.random.randn(network_size[i], network_size[i + 1]) * np.sqrt(2.0 / input_size)
+                b = np.random.randn(1, network_size[i + 1])
+
+                # weight.append(t.reshape((network_size[i] + 1, network_size[i + 1])))
+                weight.append(w)
+                bias.append(b)
             self.Theta = theta
+            self.weight = weight
+            self.bias = bias
+
+        self.weight = []
+        self.bias = []
+
+        for i in range(len(network_size) - 1):
+            input_size = network_size[i]
+            output_size = network_size[i + 1]
+
+            # He initialization
+            w = np.random.randn(input_size, output_size) * np.sqrt(2.0 / input_size)
+            b = np.random.randn(1, output_size)
+
+            self.weight.append(w)
+            self.bias.append(b)
+
         return theta
 
     def set_activation_function(self, activation_function: Union[int, str]):
@@ -119,6 +159,20 @@ class ANNet:
                 self.init_method = Initialization[init.upper()]
             except KeyError:
                 raise ValueError(f"String '{init}' is not a valid Init function")
+        else:
+            raise TypeError("Input must be an integer or a string")
+
+    def set_output_activation(self, output: Union[int, str]):
+        if isinstance(output, int):
+            try:
+                self.output_func = ActivationFunction(output)
+            except ValueError:
+                raise ValueError(f"Integer {output} is not a valid value for Activation Function")
+        elif isinstance(output, str):
+            try:
+                self.output_func = ActivationFunction[output.upper()]
+            except KeyError:
+                raise ValueError(f"String '{output}' is not a valid activation function")
         else:
             raise TypeError("Input must be an integer or a string")
 
@@ -163,7 +217,7 @@ class ANNet:
                 images.append(Image.open(im_dir))
             i += 1
         print("Images loaded")
-        images[0].save('movie.gif', save_all=True, append_images=images, duration=50)
+        images[0].save('movie.gif', save_all=True, append_images=images, duration=10)
 
     def set_network_architecture(self, network_architecture: list):
         """ Assigns the provided network_architecture variable to the internal class-variable self.network_architecture
@@ -252,6 +306,8 @@ class ANNet:
             self.feature_max_vector = feature_max_vector
 
         # ----- Normalize data -----
+
+        # MINMAX
         if self.norm_method == Normalization.MINMAX:
             for iFeat in range(0, data.shape[feat_axis]):
                 d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
@@ -262,6 +318,7 @@ class ANNet:
                     data[:, iFeat] = d_norm
                 else:
                     data[iFeat, :] = d_norm
+        # Z-SCORE
         elif self.norm_method == Normalization.ZSCORE:
             for iFeat in range(0, data.shape[feat_axis]):
                 d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
@@ -271,6 +328,7 @@ class ANNet:
                     data[:, iFeat] = d_norm
                 else:
                     data[iFeat, :] = d_norm
+        # MIN MAX ALL
         elif self.norm_method == Normalization.MINMAX_ALL:
             for iFeat in range(0, data.shape[0]):
                 d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
@@ -280,6 +338,7 @@ class ANNet:
                     data[:, iFeat] = d_norm
                 else:
                     data[iFeat, :] = d_norm
+        # DEPRECATED
         elif self.norm_method == Normalization.MINMAX_OLD:
             for iData in range(0, data.shape[0]):
                 d = np.array(data[iData, :])
@@ -376,67 +435,6 @@ class ANNet:
         if 'self.output_layer_size' not in locals():
             self.output_layer_size = len(np.unique(labels))
 
-    def forward_propagation(self, x, y=None):
-        """ Will make predictions by forward propagate the provided input data x through the neural network stored in
-            within the class. If the annotations (labels) are provided through the y-input variable, the cost (c) of the
-            network will be calculated post the forward propagation using the least-square method. Else the cost will be
-            set to None. Along with the predictions (h) per provided samples and the total cost (c), the method will
-            return a list of all activation layers (a_list) and a list of all sigmoid layers (z_list)
-
-        :param x:  (npArray) Input data to be propagated through the neural network, Either one or more samples.
-        :param y:  (npArray) [optional] Annotations to be used to calculate the network cost
-
-        :return h, (npArray)   Prediction array
-                c, (float)     Network cost
-                a_list, (list) List of all activation layers
-                z_list: (list) List of sigmoid layers
-        """
-        num_of_samples = len(x) if len(x.shape) > 1 else 1  # Sets the number of samples based on the dimensions of the
-        #                                                     provided input data (x)
-        bias = np.ones((num_of_samples, 1))                 # Create bias units
-        a = x                                               # Sets first activation layer to the provided input data
-
-        a_list = []  # List containing all activation in the forward propagation
-        if num_of_samples > 1:
-            a = np.vstack([bias.T, a.T])
-            a = a.T
-        else:
-            a = np.append(bias, a)
-        a_list.append(a)
-
-        z_list = []  # List to hold all sigmoid values
-        for i, theta in enumerate(self.Theta):   # Forward propagate through all layers
-            t = theta.reshape(self.network_size[i]+1, self.network_size[i+1])  # Reshape parameter matrix
-
-            z = np.matmul(a, t)  # z = a*t
-            z_list.append(z)     # Store the sigmoid values
-            a = activate(self.activation_func, z)       # Calculate the activation layer
-
-            # add bias unit
-            if num_of_samples > 1:
-                a = np.column_stack([bias, a])
-            else:
-                a = np.append(bias, a)
-
-            a_list.append(a)     # Store activation layer
-
-        h = a  # Prediction layer is equal to the final activation layer
-        # pop bias unit
-        if len(h.shape) > 1:
-            h = h[:, 1:]
-        else:
-            h = h[1:]
-        a_list.pop(-1)  # Last layer in a is equivalent to h
-
-        # Calculate cost (Least Square Method)
-        if y is None:
-            # labels has not been provided, cost can not be calculated
-            c = None
-        else:
-            c = (1 / (2 * num_of_samples)) * np.sum((h - y) ** 2)  # Cost with LSM
-
-        return h, c, a_list, z_list
-
     def draw_and_predict(self):
         """ The method will randomly pick a sample in the test data-set and makes a prediction by doing a forward
             propagation using the current state of the neural network. If the network data is the mnist data-set
@@ -481,9 +479,135 @@ class ANNet:
         if "init_method" in settings.keys():
             self.set_init_function(settings["init_method"])
 
-    def back_propagation(self, delta, z_mat, a_mat):
-        lr = (1 / len(delta))
+        if "output_activation" in settings.keys():
+            self.set_output_activation(settings["output_activation"])
 
+    def forward(self, x):
+        """ Performs the forward propagation through the neural network.
+
+        :param x: (numpy array) Input data of shape (m, input_size), where m is the number of examples.
+        :return:
+            activations: (list) List of activation values for each layer.
+            zs: (list) List of z values (weighted input to activation functions) for each layer.
+            output: (numpy array) Final output of the network.
+        """
+        activations = [x]  # Store the input layer activations
+        zs = []            # Store the z values for each layer
+
+        for i in range(len(self.weight)):
+            # Compute the z value (weighted sum of inputs + bias)
+            z = np.dot(activations[-1], self.weight[i]) + self.bias[i]
+            zs.append(z)  # Store the z value
+            # Apply the activation function (sigmoid)
+            a = activate(self.activation_func, z) if i != len(self.weight) - 1 else activate(self.output_func, z)
+            activations.append(a)  # Store the activations
+
+        return activations, zs, activations[-1]
+
+    def back(self, activations, z_list, y):
+        """ Performs the backpropagation through the neural network to update weights and biases.
+
+        :param activations: (list) List of activation values for each layer.
+        :param z_list: (list) List of z values (weighted input to activation functions) for each layer.
+        :param y: (numpy array) True labels of shape (m,), where m is the number of examples.
+        :return: None
+        """
+        # Reshape y to match the output shape
+        if activations[-1].shape != y.shape:
+            y = y.reshape(-1, 1)
+
+        # Calculate the error at the output layer (difference between prediction and true label)
+        output_error = (activations[-1] - y)
+        # Calculate delta for the output layer
+        deltas = [output_error * gradient(self.output_func, z_list[-1])]
+
+        # Initialize gradients for biases and weights for each layer
+        d_bias = [deltas[-1].mean(axis=0)]
+        d_weight = [np.dot(activations[-2].T, deltas[-1])]
+
+        # Iterate backwards through the network layers
+        for l in reversed(range(len(self.weight) - 1)):
+            z = z_list[l]
+            zp = gradient(self.activation_func, z)
+            delta = np.dot(deltas[-1], self.weight[l + 1].T) * zp
+            deltas.append(delta)
+            d_bias.append(delta.mean(axis=0))
+            d_weight.append(np.dot(activations[l].T, delta))
+
+        # Reverse the gradients to align with the network layer order
+        d_weight.reverse()
+        d_bias.reverse()
+
+        # Update the weights and biases using the calculated gradients
+        for i in range(len(self.weight)):
+            # self.weight[i] -= self.alpha * d_weight[i]
+            self.bias[i] -= self.alpha * d_bias[i]
+        self.optimizer.set_parameters(self.weight)
+        self.weight = self.optimizer.step(d_weight)
+
+    def forward_propagation(self, x, y=None):
+        """ Will make predictions by forward propagate the provided input data x through the neural network stored in
+            within the class. If the annotations (labels) are provided through the y-input variable, the cost (c) of the
+            network will be calculated post the forward propagation using the least-square method. Else the cost will be
+            set to None. Along with the predictions (h) per provided samples and the total cost (c), the method will
+            return a list of all activation layers (a_list) and a list of all sigmoid layers (z_list)
+
+        :param x:  (npArray) Input data to be propagated through the neural network, Either one or more samples.
+        :param y:  (npArray) [optional] Annotations to be used to calculate the network cost
+
+        :return h, (npArray)   Prediction array
+                c, (float)     Network cost
+                a_list, (list) List of all activation layers
+                z_list: (list) List of sigmoid layers
+        """
+        num_of_samples = len(x) if len(x.shape) > 1 else 1  # Sets the number of samples based on the dimensions of the
+        #                                                     provided input data (x)
+        bias = np.ones((num_of_samples, 1))                 # Create bias units
+        a = x                                               # Sets first activation layer to the provided input data
+
+        a_list = []  # List containing all activation in the forward propagation
+        if num_of_samples > 1:
+            a = np.vstack([bias.T, a.T])
+            a = a.T
+        else:
+            a = np.append(bias, a)
+        a_list.append(a)
+
+        z_list = []  # List to hold all sigmoid values
+        for i, theta in enumerate(self.Theta):   # Forward propagate through all layers
+            t = theta.reshape(self.network_size[i]+1, self.network_size[i+1])  # Reshape parameter matrix
+
+            z = np.matmul(a, t)  # z = a*t
+            z_list.append(z)     # Store the sigmoid values
+
+            a = activate(self.activation_func, z) if i != len(self.Theta) - 1 else activate(self.output_func, z)
+
+            # add bias unit
+            if num_of_samples > 1:
+                a = np.column_stack([bias, a])
+            else:
+                a = np.append(bias, a)
+
+            a_list.append(a)     # Store activation layer
+
+        h = a  # Prediction layer is equal to the final activation layer
+        # pop bias unit
+        if len(h.shape) > 1:
+            h = h[:, 1:]
+        else:
+            h = h[1:]
+        a_list.pop(-1)  # Last layer in a is equivalent to h
+
+        # Calculate cost (Least Square Method)
+        if y is None:
+            # labels has not been provided, cost can not be calculated
+            c = None
+        else:
+            c = (1 / (2 * num_of_samples)) * np.sum((h - y) ** 2)  # Cost with LSM
+
+        return h, c, a_list, z_list
+
+    def back_propagation(self, delta, z_mat, a_mat):
         # Init weight gradient matrices
         theta_grad = []
         for iLayer, theta in enumerate(self.Theta):
@@ -503,20 +627,23 @@ class ANNet:
                 delta = delta_weight * sig_z.T
                 delta = delta.T
             else:
-                delta = delta * gradient(self.activation_func, z)
+                delta = delta * gradient(self.output_func, z)
 
             a = a_mat[iLayer]
             th_grad = np.dot(a.T, delta)
             theta_grad[iLayer] += th_grad
 
         # Update weights from the weight gradients
-        for i, theta_val in enumerate(theta_grad):
-            theta_grad[i] = lr * theta_val
-            t = self.alpha * theta_grad[i]
-            tf = t.flatten()
-            self.Theta[i] -= tf
+        if self.use_optimizer and False:
+            self.optimizer.set_parameters(self.Theta)
+            self.Theta = self.optimizer.step(theta_grad)
+        else:
+            for i, theta_val in enumerate(theta_grad):
+                theta_grad[i] = (1 / len(delta)) * theta_val
+                t = self.alpha * theta_grad[i]
+                self.Theta[i] -= t.flatten()
 
-    def train_network(self, x=None, y=None, num_of_iterations=1000, visualize_training=True):
+    def train_network(self, x=None, y=None, num_of_iterations=1000, visualize_training=False):
         """ The method will initialize a training session with a number of training iterations determined by the
             variable num_of_iterations (int). The network will be trained using the x data as input data and the
             y data as the annotations. If x or y are not provided the input data and the annotation data will be
@@ -557,9 +684,17 @@ class ANNet:
         # unique classes in the training data. The correct classification will be marked by a one while the false
         # classifications are marked with a zero for all samples. The label matrix will be of the size
         # [num_of_train_samples x num_of_unique_classes]
-        y_mat = np.zeros((y.shape[0], self.output_layer_size))
-        for i, val in enumerate(y):
-            y_mat[i][int(val)] = 1
+        if len(y.shape) < 2:
+            y_mat = y
+            # y_mat = np.zeros((y.shape[0], self.output_layer_size))
+            # for i, val in enumerate(y):
+            #    y_mat[i][int(val)] = 1
+        elif y.shape[0] == 1 or y.shape[1] == 1:
+            y_mat = np.zeros((y.shape[0], self.output_layer_size))
+            for i, val in enumerate(y):
+                y_mat[i][int(val)] = 1
+        else:
+            y_mat = y
 
         cost = np.zeros([num_of_iterations, 1])      # Holding cost value per iteration
         accuracy = np.zeros([num_of_iterations, 1])  # Holding accuracy value per iteration
@@ -571,8 +706,10 @@ class ANNet:
                 theta_grad.append(np.zeros(theta.shape))
 
             h_mat, c, a_mat, z_mat = ANNet.forward_propagation(self, x, y_mat)  # Forward propagate
-
-            delta = -(y_mat-h_mat)
+            if len(y_mat.shape) < 2:
+                delta = (h_mat.transpose() - y).transpose()
+            else:
+                delta = -(y_mat-h_mat)
             for iLayer in range(len(a_mat)-1, -1, -1):
                 z = z_mat[iLayer]
                 if not iLayer == len(a_mat)-1:
@@ -586,17 +723,21 @@ class ANNet:
                     delta = delta_weight * sig_z.T
                     delta = delta.T
                 else:
-                    delta = delta * gradient(self.activation_func, z)
+                    delta = delta * gradient(self.output_func, z)
 
                 a = a_mat[iLayer]
                 th_grad = np.dot(a.T, delta)
                 theta_grad[iLayer] += th_grad
 
             # Update weights from the weight gradients
-            for i, theta_val in enumerate(theta_grad):
-                theta_grad[i] = (1/num_of_samples)*theta_val
-                t = self.alpha * theta_grad[i]
-                self.Theta[i] -= t.flatten()
+            if self.use_optimizer:
+                self.optimizer.set_parameters(self.Theta)
+                self.Theta = self.optimizer.step(theta_grad)
+            else:
+                for i, theta_val in enumerate(theta_grad):
+                    theta_grad[i] = (1/num_of_samples)*theta_val
+                    t = self.alpha * theta_grad[i]
+                    self.Theta[i] -= t.flatten()
 
             # Save the weight values for animation
             historic_theta.append(copy.deepcopy(self.Theta))
