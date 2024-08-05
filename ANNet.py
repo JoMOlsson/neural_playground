@@ -10,9 +10,10 @@ import glob
 import random
 from enum import Enum
 from typing import Union
+from types import SimpleNamespace
 
-from .utils.activation import activate, gradient, ActivationFunction
-from .opimizer.adam import AdamOptimizer
+from utils.activation import activate, gradient, ActivationFunction
+from opimizer.adam import AdamOptimizer
 
 # TODO - CLEAN UP CODE
 # TODO - Move normalization
@@ -21,6 +22,7 @@ from .opimizer.adam import AdamOptimizer
 # TODO - RE WRITE TRAINING AND REMOVE DEPRICATED
 # TODO - ADD SAVE METHOD
 # TODO - ADD LOAD METHOD
+# TODO - CHECK OPTIMIZER
 
 
 class Normalization(Enum):
@@ -37,12 +39,16 @@ class Initialization(Enum):
 
 class ANNet:
     def __init__(self, network_settings: dict = None):
+        # Params
         self.default_hidden_layer_size = 15  # Default number of neurons in hidden layer
         self.epsilon = 0.12                  # Initialization value for weight matrices
-        self.alpha = 10                       # Learning rate
-        self.network_size = []               # Default network size
-        self.Theta = []                      # Holding weight matrices
-        self.weight = []
+        self.alpha = 10                      # Learning rate
+
+        # Network
+        self.Theta = []  # Holding weight matrices
+        self.network = SimpleNamespace(weight=[], bias=[])
+
+        # Normalization
         self.feature_mean_vector = []        # (list) average values in data per feature
         self.feature_var_vector = []         # (list) variance values in data per feature
         self.data_min = None                 # (float) min value in input data
@@ -50,20 +56,28 @@ class ANNet:
         self.data_max = None                 # (float) max value in input data
         self.feature_max_vector = []         # (list) max values in data per feature
         self.num_of_train_samples = None     # (int) Number of train samples
-        self.input_shape = []                # Original shape of input data
+
+        # Data
         self.num_of_test_samples = None      # (int) Number of labels in test data-set
         self.train_data = np.array([])       # Hold train data
         self.test_data = np.array([])        # Holds test data
         self.train_labels = []               # Labels for train-data
         self.test_labels = []                # Labels for test-data
-        self.output_layer_size = []          # Output layer size
+
+        # Network architecture
+        self.network_size = []  # Default network size
+        self.input_shape = []  # Original shape of input data
+        self.output_layer_size = None          # Output layer size
         self.input_layer_size = None         # Input layer size
         self.network_architecture = None     # Network architecture
-        self.gif_created = False             # Boolean variable if gif was ever created
-        self.is_mnist = False                # Boolean variable stating if mnist data-set is used
+
+        # Visualization
         self.orig_images = []                # List holding the original images
         self.orig_test_images = []           # List holding the original test images
+        self.gif_created = False             # Boolean variable if gif was ever created
+        self.is_mnist = False                # Boolean variable stating if mnist data-set is used
 
+        # Settings
         self.activation_func = ActivationFunction.SIGMOID     # Activation function [DEFAULTS TO sigmoid)
         self.norm_method = Normalization.ZSCORE            # Normalization method
         self.init_method = Initialization.HE               # Init method
@@ -72,8 +86,9 @@ class ANNet:
         if network_settings is not None:
             self.set_network_settings(network_settings)
 
-        self.optimizer = AdamOptimizer(self.Theta, learning_rate=self.alpha)
-        self.use_optimizer = True
+        # Optimizer
+        self.optimizer = AdamOptimizer(self.network.weight, learning_rate=self.alpha)
+        self.use_optimizer = False
 
     def set_alpha(self, alpha):
         self.alpha = alpha
@@ -90,8 +105,6 @@ class ANNet:
 
         theta = []
         self.network_size = network_size
-        weight = []
-        bias = []
 
         if self.init_method == Initialization.EPSILON:
             for i in range(0, len(network_size)-1):
@@ -107,19 +120,10 @@ class ANNet:
                 # He initialization
                 t = np.random.randn(1, n) * np.sqrt(2.0 / input_size)
                 theta.append(t)
-
-                w = np.random.randn(network_size[i], network_size[i + 1]) * np.sqrt(2.0 / input_size)
-                b = np.random.randn(1, network_size[i + 1])
-
-                # weight.append(t.reshape((network_size[i] + 1, network_size[i + 1])))
-                weight.append(w)
-                bias.append(b)
             self.Theta = theta
-            self.weight = weight
-            self.bias = bias
 
-        self.weight = []
-        self.bias = []
+        self.network.weight = []
+        self.network.bias = []
 
         for i in range(len(network_size) - 1):
             input_size = network_size[i]
@@ -129,8 +133,8 @@ class ANNet:
             w = np.random.randn(input_size, output_size) * np.sqrt(2.0 / input_size)
             b = np.random.randn(1, output_size)
 
-            self.weight.append(w)
-            self.bias.append(b)
+            self.network.weight.append(w)
+            self.network.bias.append(b)
 
         return theta
 
@@ -494,12 +498,12 @@ class ANNet:
         activations = [x]  # Store the input layer activations
         zs = []            # Store the z values for each layer
 
-        for i in range(len(self.weight)):
+        for i in range(len(self.network.weight)):
             # Compute the z value (weighted sum of inputs + bias)
-            z = np.dot(activations[-1], self.weight[i]) + self.bias[i]
+            z = np.dot(activations[-1], self.network.weight[i]) + self.network.bias[i]
             zs.append(z)  # Store the z value
             # Apply the activation function (sigmoid)
-            a = activate(self.activation_func, z) if i != len(self.weight) - 1 else activate(self.output_func, z)
+            a = activate(self.activation_func, z) if i != len(self.network.weight) - 1 else activate(self.output_func, z)
             activations.append(a)  # Store the activations
 
         return activations, zs, activations[-1]
@@ -526,10 +530,10 @@ class ANNet:
         d_weight = [np.dot(activations[-2].T, deltas[-1])]
 
         # Iterate backwards through the network layers
-        for l in reversed(range(len(self.weight) - 1)):
+        for l in reversed(range(len(self.network.weight) - 1)):
             z = z_list[l]
             zp = gradient(self.activation_func, z)
-            delta = np.dot(deltas[-1], self.weight[l + 1].T) * zp
+            delta = np.dot(deltas[-1], self.network.weight[l + 1].T) * zp
             deltas.append(delta)
             d_bias.append(delta.mean(axis=0))
             d_weight.append(np.dot(activations[l].T, delta))
@@ -539,11 +543,14 @@ class ANNet:
         d_bias.reverse()
 
         # Update the weights and biases using the calculated gradients
-        for i in range(len(self.weight)):
-            # self.weight[i] -= self.alpha * d_weight[i]
-            self.bias[i] -= self.alpha * d_bias[i]
-        self.optimizer.set_parameters(self.weight)
-        self.weight = self.optimizer.step(d_weight)
+        for i in range(len(self.network.weight)):
+            if not self.use_optimizer:
+                self.network.weight[i] -= self.alpha * d_weight[i]
+            self.network.bias[i] -= self.alpha * d_bias[i]
+
+        if self.use_optimizer:
+            self.optimizer.set_parameters(self.network.weight)
+            self.network.weight = self.optimizer.step(d_weight)
 
     def forward_propagation(self, x, y=None):
         """ Will make predictions by forward propagate the provided input data x through the neural network stored in
