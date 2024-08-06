@@ -12,8 +12,13 @@ from enum import Enum
 from typing import Union
 from types import SimpleNamespace
 
-from utils.activation import activate, gradient, ActivationFunction
-from opimizer.adam import AdamOptimizer
+try:
+    from utils.activation import activate, gradient, ActivationFunction
+    from utils.opimizer.adam import AdamOptimizer
+except ModuleNotFoundError:
+    from .utils.activation import activate, gradient, ActivationFunction
+    from .utils.opimizer.adam import AdamOptimizer
+
 
 # TODO - CLEAN UP CODE
 # TODO - Move normalization
@@ -81,7 +86,7 @@ class ANNet:
         self.activation_func = ActivationFunction.SIGMOID     # Activation function [DEFAULTS TO sigmoid)
         self.norm_method = Normalization.ZSCORE            # Normalization method
         self.init_method = Initialization.HE               # Init method
-        self.output_func = self.activation_func
+        self.output_func = self.activation_func            # Make output function to default ot activation function
 
         if network_settings is not None:
             self.set_network_settings(network_settings)
@@ -1015,8 +1020,7 @@ class ANNet:
         :param num_of_iterations: (int) Total number of iterations
         :return num_of_digits:    (int) Total number of needed digits in the file-naming
         """
-        num_of_digits = math.ceil(math.log10(num_of_iterations + 0.001))
-        return num_of_digits
+        return math.ceil(math.log10(num_of_iterations + 0.001))
 
     @staticmethod
     def append_with_zeros(num_of_digits, iteration):
