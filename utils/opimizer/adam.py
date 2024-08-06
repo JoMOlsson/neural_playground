@@ -22,13 +22,12 @@ class AdamOptimizer:
             self.m = [np.zeros_like(param) for param in parameters]
             self.v = [np.zeros_like(param) for param in parameters]
 
-    def step(self, gradients):
+    def step(self, gradients, flatten: bool = False):
         self.t += 1
         updated_parameters = []
 
         for i in range(len(self.parameters)):
-            # g = gradients[i].flatten()
-            g = gradients[i]
+            g = gradients[i] if flatten else gradients[i].flatten()
 
             # Update biased first moment estimate
             self.m[i] = self.beta1 * self.m[i] + (1 - self.beta1) * g

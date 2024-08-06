@@ -11,6 +11,10 @@ import random
 from enum import Enum
 from typing import Union
 from types import SimpleNamespace
+from six.moves import urllib
+opener = urllib.request.build_opener()
+opener.addheaders = [('User-agent', 'Mozilla/5.0')]
+urllib.request.install_opener(opener)
 
 try:
     from utils.activation import activate, gradient, ActivationFunction
@@ -19,12 +23,11 @@ except ModuleNotFoundError:
     from .utils.activation import activate, gradient, ActivationFunction
     from .utils.opimizer.adam import AdamOptimizer
 
-
 # TODO - CLEAN UP CODE
 # TODO - Move normalization
-# TODO - CHECK HOW TO SET SETTINGS CONVININTLY
+# TODO - CHECK HOW TO SET SETTINGS CONVENIENTLY
 # TODO - MOVE VISUALIZATION
-# TODO - RE WRITE TRAINING AND REMOVE DEPRICATED
+# TODO - RE WRITE TRAINING AND REMOVE DEPRECATED
 # TODO - ADD SAVE METHOD
 # TODO - ADD LOAD METHOD
 # TODO - CHECK OPTIMIZER
@@ -212,7 +215,7 @@ class ANNet:
 
         print("Creating gif ... ")
         cur_path = os.path.dirname(os.path.realpath(__file__))
-        temp_path = os.path.join(cur_path, 'temp')
+        temp_path = os.path.join(cur_path, 'data', 'data_dump', 'images')
         image_directory = glob.glob(temp_path + '/*.png')
 
         # Sort image paths based on numeric part of filename
@@ -226,7 +229,8 @@ class ANNet:
                 images.append(Image.open(im_dir))
             i += 1
         print("Images loaded")
-        images[0].save('movie.gif', save_all=True, append_images=images, duration=10)
+        images[0].save(os.path.join(cur_path, 'data', 'data_dump', 'movie.gif'),
+                       save_all=True, append_images=images, duration=10)
 
     def set_network_architecture(self, network_architecture: list):
         """ Assigns the provided network_architecture variable to the internal class-variable self.network_architecture
@@ -781,10 +785,12 @@ class ANNet:
                 h_test, c_test, a_test, z_test = ANNet.forward_propagation(self, self.test_data[picture_idx, :],
                                                                            self.test_labels[picture_idx])
                 picture = self.orig_test_images[picture_idx, :, :]
+            else:
+                picture, a_test, z_test, h_test = None, None, None, None
 
             # create dump json file
             cur_path = os.path.dirname(os.path.realpath(__file__))
-            data_path = os.path.join(cur_path, 'data_dump')
+            data_path = os.path.join(cur_path, 'data', 'data_dump', 'training')
 
             if not os.path.exists(data_path):
                 # Create dump folder
@@ -1001,7 +1007,7 @@ class ANNet:
         :return temp_folder: (str) path to temp folder
         """
         current_path = os.path.dirname(os.path.realpath(__file__))  # Get current directory path
-        temp_folder = os.path.join(current_path, 'temp')            # Temp folder path
+        temp_folder = os.path.join(current_path, 'data', 'data_dump', 'images')  # Temp folder for storing images
         if not os.path.exists(temp_folder):
             os.makedirs(temp_folder)                                # Create if not already exist
 
