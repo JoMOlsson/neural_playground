@@ -7,6 +7,7 @@ class ActivationFunction(Enum):
     SIGMOID = 1
     RELU = 2
     TANH = 3
+    LINEAR = 4
 
 
 def activate(function: ActivationFunction, z):
@@ -14,6 +15,8 @@ def activate(function: ActivationFunction, z):
         return sigmoid(z)
     elif function == ActivationFunction.RELU:
         return relu(z)
+    elif function == ActivationFunction.LINEAR:
+        return linear(z)
     else:
         raise ValueError
 
@@ -23,6 +26,8 @@ def gradient(function: ActivationFunction, z):
         return sigmoid_gradient(z)
     elif function == ActivationFunction.RELU:
         return relu_gradient(z)
+    elif function == ActivationFunction.LINEAR:
+        return linear_gradient(z)
     else:
         raise ValueError
 
@@ -33,7 +38,7 @@ def sigmoid(z):
     :param z: (float, int, npArray) Input data
     :return g: Output of sigmoid function
     """
-    g = 1 / (1 + e**(-z))
+    g = 1 / (1 + np.exp(-z))
     return g
 
 
@@ -43,8 +48,8 @@ def sigmoid_gradient(z):
     :param z: (float, int, npArray) Input data
     :return g: Output of sigmoid derivative function
     """
-    g = sigmoid(z)*(1 - sigmoid(z))
-    return g
+    g = sigmoid(z)
+    return g * (1 - g)
 
 
 def relu(z):
@@ -65,3 +70,11 @@ def relu_gradient(z):
     """
     g = np.where(z > 0, 1, 0)
     return g
+
+
+def linear(z):
+    return z
+
+
+def linear_gradient(z):
+    return np.ones_like(z)
