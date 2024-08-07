@@ -31,8 +31,6 @@ except ModuleNotFoundError:
 # TODO - ADD SAVE METHOD
 # TODO - ADD LOAD METHOD
 # TODO - CHECK OPTIMIZER
-# TODO - WHY IS NETWORK_ARCHITECTURE AND NETWORK_SIZE
-
 
 class Normalization(Enum):
     MINMAX = 1
@@ -48,6 +46,12 @@ class Initialization(Enum):
 
 class ANNet:
     def __init__(self, network_settings: dict = None):
+        # Settings
+        self.activation_func = ActivationFunction.SIGMOID     # Activation function [DEFAULTS TO sigmoid)
+        norm_method = Normalization.ZSCORE            # Normalization method
+        self.init_method = Initialization.HE               # Init method
+        self.output_func = self.activation_func            # Make output function to default ot activation function
+
         # Params
         self.default_hidden_layer_size = 15  # Default number of neurons in hidden layer
         self.epsilon = 0.12                  # Initialization value for weight matrices
@@ -64,7 +68,8 @@ class ANNet:
                                              feature_min_vector=[],  # (list) min values in data per feature
                                              feature_max_vector=[],  # (list) max values in data per feature
                                              data_min=[],            # (float) min value in input data
-                                             data_max=[])            # (float) max value in input data
+                                             data_max=[],            # (float) max value in input data
+                                             norm_method=norm_method)
         # self.feature_mean_vector = []        # (list) average values in data per feature
         # self.feature_var_vector = []         # (list) variance values in data per feature
         # self.data_min = None                 # (float) min value in input data
@@ -81,7 +86,6 @@ class ANNet:
         self.test_labels = []                # Labels for test-data
 
         # Network architecture
-        self.network_size = []  # Default network size
         self.input_shape = []  # Original shape of input data
         self.output_layer_size = None          # Output layer size
         self.input_layer_size = None         # Input layer size
@@ -92,12 +96,6 @@ class ANNet:
         self.orig_test_images = []           # List holding the original test images
         self.gif_created = False             # Boolean variable if gif was ever created
         self.is_mnist = False                # Boolean variable stating if mnist data-set is used
-
-        # Settings
-        self.activation_func = ActivationFunction.SIGMOID     # Activation function [DEFAULTS TO sigmoid)
-        self.norm_method = Normalization.ZSCORE            # Normalization method
-        self.init_method = Initialization.HE               # Init method
-        self.output_func = self.activation_func            # Make output function to default ot activation function
 
         if network_settings is not None:
             self.set_network_settings(network_settings)
@@ -120,7 +118,7 @@ class ANNet:
         """
 
         theta = []
-        self.network_size = network_size
+        self.network_architecture = network_size
 
         if self.init_method == Initialization.EPSILON:
             for i in range(0, len(network_size)-1):
@@ -129,9 +127,9 @@ class ANNet:
                 theta.extend(t)
             self.Theta = theta
         else:
-            for i in range(len(self.network_size) - 1):
+            for i in range(len(self.network_architecture) - 1):
                 n = (network_size[i] + 1) * network_size[i + 1]
-                input_size = self.network_size[i]
+                input_size = self.network_architecture[i]
 
                 # He initialization
                 t = np.random.randn(1, n) * np.sqrt(2.0 / input_size)
@@ -199,12 +197,12 @@ class ANNet:
     def set_normalization_method(self, norm_method: Union[int, str]):
         if isinstance(norm_method, int):
             try:
-                self.norm_method = Normalization(norm_method)
+                self.normalization.norm_method = Normalization(norm_method)
             except ValueError:
                 raise ValueError(f"Integer {norm_method} is not a valid value for Activation Function")
         elif isinstance(norm_method, str):
             try:
-                self.norm_method = Normalization[norm_method.upper()]
+                self.normalization.norm_method = Normalization[norm_method.upper()]
             except KeyError:
                 raise ValueError(f"String '{norm_method}' is not a valid activation function")
         else:
@@ -329,7 +327,7 @@ class ANNet:
         # ----- Normalize data -----
 
         # MINMAX
-        if self.norm_method == Normalization.MINMAX:
+        if self.normalization.norm_method == Normalization.MINMAX:
             for iFeat in range(0, data.shape[feat_axis]):
                 d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
                 d_norm = ((2 * (d - self.normalization.feature_min_vector[iFeat])) /
@@ -341,7 +339,7 @@ class ANNet:
                 else:
                     data[iFeat, :] = d_norm
         # Z-SCORE
-        elif self.norm_method == Normalization.ZSCORE:
+        elif self.normalization.norm_method == Normalization.ZSCORE:
             for iFeat in range(0, data.shape[feat_axis]):
                 d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
                 d_norm = (d - self.normalization.feature_mean_vector[iFeat]) / self.normalization.feature_var_vector[iFeat]
@@ -351,7 +349,7 @@ class ANNet:
                 else:
                     data[iFeat, :] = d_norm
         # MIN MAX ALL
-        elif self.norm_method == Normalization.MINMAX_ALL:
+        elif self.normalization.norm_method == Normalization.MINMAX_ALL:
             for iFeat in range(0, data.shape[0]):
                 d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
                 d_norm = ((2*(d - self.normalization.data_min)) /
@@ -362,7 +360,7 @@ class ANNet:
                 else:
                     data[iFeat, :] = d_norm
         # DEPRECATED
-        elif self.norm_method == Normalization.MINMAX_OLD:
+        elif self.normalization.norm_method == Normalization.MINMAX_OLD:
             for iData in range(0, data.shape[0]):
                 d = np.array(data[iData, :])
                 d_norm = (2*(d - self.normalization.data_min)) / (self.normalization.data_max
@@ -603,7 +601,7 @@ class ANNet:
 
         z_list = []  # List to hold all sigmoid values
         for i, theta in enumerate(self.Theta):   # Forward propagate through all layers
-            t = theta.reshape(self.network_size[i]+1, self.network_size[i+1])  # Reshape parameter matrix
+            t = theta.reshape(self.network_architecture[i]+1, self.network_architecture[i+1])  # Reshape parameter matrix
 
             z = np.matmul(a, t)  # z = a*t
             z_list.append(z)     # Store the sigmoid values
@@ -639,7 +637,7 @@ class ANNet:
         # Init weight gradient matrices
         theta_grad = []
         for iLayer, theta in enumerate(self.Theta):
-            theta = theta.reshape(self.network_size[iLayer] + 1, self.network_size[iLayer + 1])
+            theta = theta.reshape(self.network_architecture[iLayer] + 1, self.network_architecture[iLayer + 1])
             theta_grad.append(np.zeros(theta.shape))
 
         for iLayer in range(len(a_mat) - 1, -1, -1):
@@ -647,7 +645,7 @@ class ANNet:
             if not iLayer == len(a_mat) - 1:
                 index = iLayer + 1
                 theta = self.Theta[index]
-                t = theta.reshape(self.network_size[index] + 1, self.network_size[index + 1])
+                t = theta.reshape(self.network_architecture[index] + 1, self.network_architecture[index + 1])
                 t = t[1:, :]
 
                 delta_weight = np.dot(t, delta.T)
@@ -730,7 +728,7 @@ class ANNet:
             # Init weight gradient matrices
             theta_grad = []
             for iLayer, theta in enumerate(self.Theta):
-                theta = theta.reshape(self.network_size[iLayer]+1, self.network_size[iLayer+1])
+                theta = theta.reshape(self.network_architecture[iLayer]+1, self.network_architecture[iLayer+1])
                 theta_grad.append(np.zeros(theta.shape))
 
             h_mat, c, a_mat, z_mat = ANNet.forward_propagation(self, x, y_mat)  # Forward propagate
@@ -743,7 +741,7 @@ class ANNet:
                 if not iLayer == len(a_mat)-1:
                     index = iLayer + 1
                     theta = self.Theta[index]
-                    t = theta.reshape(self.network_size[index] + 1, self.network_size[index + 1])
+                    t = theta.reshape(self.network_architecture[index] + 1, self.network_architecture[index + 1])
                     t = t[1:, :]
 
                     delta_weight = np.dot(t, delta.T)
@@ -816,7 +814,7 @@ class ANNet:
             if self.is_mnist:
                 data = {'picture': picture,
                         'theta': self.Theta,
-                        'network_size': self.network_size,
+                        'network_size': self.network_architecture,
                         'a': a_test,
                         'z': z_test,
                         'prediction': h_test}
@@ -1082,7 +1080,7 @@ class ANNet:
         network_architecture = []
         i_layer = len(theta)
         for i_layer, t in enumerate(theta):
-            theta[i_layer] = t.reshape(self.network_size[i_layer] + 1, self.network_size[i_layer + 1])
+            theta[i_layer] = t.reshape(self.network_architecture[i_layer] + 1, self.network_architecture[i_layer + 1])
             network_architecture.append(theta[i_layer].shape[0])
         network_architecture.append(theta[i_layer].shape[1])
 
