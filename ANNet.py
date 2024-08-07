@@ -59,11 +59,6 @@ class ANNet:
                                       epsilon=0.12,  # Initialization value for weight matrices
                                       use_optimizer=False)
 
-        self.default_hidden_layer_size = 15  # Default number of neurons in hidden layer
-        self.epsilon = 0.12                  # Initialization value for weight matrices
-        self.alpha = 10                      # Learning rate
-        self.use_optimizer = False
-
         # Network
         self.Theta = []  # Holding weight matrices
         self.network = SimpleNamespace(weight=[],
@@ -93,10 +88,9 @@ class ANNet:
                                     train_labels=[],  # Labels for train-data
                                     test_labels=[])  # Labels for test-data
         # Visualization
-        self.orig_images = []                # List holding the original images
-        self.orig_test_images = []           # List holding the original test images
-        self.gif_created = False             # Boolean variable if gif was ever created
-        self.is_mnist = False                # Boolean variable stating if mnist data-set is used
+        self.visual = SimpleNamespace(orig_images = [],                # List holding the original images
+                                      orig_test_images=[],  # List holding the original test images
+                                      is_mnist=False)  # Boolean variable stating if mnist data-set is used
 
         if network_settings is not None:
             self.set_network_settings(network_settings)
@@ -302,15 +296,15 @@ class ANNet:
         test_images = mnist.test_images()
         test_labels = mnist.test_labels()
 
-        self.orig_images = train_images
-        self.orig_test_images = test_images
+        self.visual.orig_images = train_images
+        self.visual.orig_test_images = test_images
 
         # Assign data
         self.set_train_data(train_images)
         self.set_train_labels(train_labels)
         self.set_test_data(test_images)
         self.set_test_labels(test_labels)
-        self.is_mnist = True
+        self.visual.is_mnist = True
 
     def normalize_data(self, data, data_axis: int = None):
         """ Takes the provided data and normalize it using the min and the max values of the data. If the min and max
@@ -838,11 +832,11 @@ class ANNet:
         if visualize_training:
 
             # # ===== Dump data to json =====
-            if self.is_mnist:
+            if self.visual.is_mnist:
                 picture_idx = random.randint(0, len(self.data.test_labels))
                 h_test, c_test, a_test, z_test = ANNet.forward_propagation(self, self.data.test_data[picture_idx, :],
                                                                            self.data.test_labels[picture_idx])
-                picture = self.orig_test_images[picture_idx, :, :]
+                picture = self.visual.orig_test_images[picture_idx, :, :]
             else:
                 picture, a_test, z_test, h_test = None, None, None, None
 
@@ -859,7 +853,7 @@ class ANNet:
                     os.remove(file)
 
             # Dump data
-            if self.is_mnist:
+            if self.visual.is_mnist:
                 data = {'picture': picture,
                         'theta': self.Theta,
                         'network_size': self.network.network_architecture,
@@ -917,7 +911,7 @@ class ANNet:
         num_of_pics_m = 23
         num_of_pics_n = 45
         tot_num_of_pics = num_of_pics_m * num_of_pics_n
-        if self.is_mnist:
+        if self.visual.is_mnist:
             picture_idx = random.sample(range(0, len(self.data.train_labels)), tot_num_of_pics)
 
         image_directory = []
@@ -944,7 +938,7 @@ class ANNet:
             outcome = []
             col = []
             col_true = []
-            if self.is_mnist:
+            if self.visual.is_mnist:
                 output_classes = list(set(self.data.train_labels))
 
                 num_of_false_predictions = np.zeros((len(output_classes),), dtype=int)
@@ -980,7 +974,7 @@ class ANNet:
             axs[1, 0].legend()
 
             # ----- Reference plot  [0, 1]-----
-            if self.is_mnist:
+            if self.visual.is_mnist:
                 classification_result = outcome[picture_idx]
                 border_thickness = 4
 
@@ -1010,7 +1004,7 @@ class ANNet:
                 for i in range(0, num_of_pics_m):
                     for j in range(0, num_of_pics_n):
                         sample_idx = picture_idx[idx]
-                        mnist_im = self.orig_images[sample_idx]
+                        mnist_im = self.visual.orig_images[sample_idx]
                         if classification_result[idx]:
                             im = im_true
                         else:
@@ -1039,7 +1033,6 @@ class ANNet:
                 axs[0, 1].set_yticks([])
 
             # ----- Network plot [1, 1]-----
-            # if self.is_mnist:
             if absolute_weight:
                 self.draw_network(historic_theta[iteration], axs[1, 1], max_weight, min_weight)
             else:
