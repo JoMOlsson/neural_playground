@@ -32,6 +32,7 @@ except ModuleNotFoundError:
 # TODO - ADD LOAD METHOD
 # TODO - CHECK OPTIMIZER
 
+
 class Normalization(Enum):
     MINMAX = 1
     ZSCORE = 2
@@ -47,20 +48,28 @@ class Initialization(Enum):
 class ANNet:
     def __init__(self, network_settings: dict = None):
         # Settings
-        self.activation_func = ActivationFunction.SIGMOID     # Activation function [DEFAULTS TO sigmoid)
-        norm_method = Normalization.ZSCORE            # Normalization method
+        activation_func = ActivationFunction.SIGMOID
+        norm_method = Normalization.ZSCORE
         self.init_method = Initialization.HE               # Init method
-        self.output_func = self.activation_func            # Make output function to default ot activation function
+        output_func = activation_func
 
         # Params
         self.default_hidden_layer_size = 15  # Default number of neurons in hidden layer
         self.epsilon = 0.12                  # Initialization value for weight matrices
         self.alpha = 10                      # Learning rate
+        self.use_optimizer = False
 
         # Network
         self.Theta = []  # Holding weight matrices
         self.network = SimpleNamespace(weight=[],
-                                       bias=[])
+                                       bias=[],
+                                       activation_func=activation_func,  # Activation function [DEFAULTS TO sigmoid)
+                                       output_func=output_func,  # Make output function to default ot activation func
+                                       input_shape=[],  # Original shape of input data
+                                       output_layer_size=None,  # Output layer size
+                                       input_layer_size=None,  # Input layer size
+                                       network_architecture=None  # Network architecture
+                                       )
 
         # Normalization
         self.normalization = SimpleNamespace(feature_mean_vector=[],  # (list) average values in data per feature
@@ -69,27 +78,14 @@ class ANNet:
                                              feature_max_vector=[],  # (list) max values in data per feature
                                              data_min=[],            # (float) min value in input data
                                              data_max=[],            # (float) max value in input data
-                                             norm_method=norm_method)
-        # self.feature_mean_vector = []        # (list) average values in data per feature
-        # self.feature_var_vector = []         # (list) variance values in data per feature
-        # self.data_min = None                 # (float) min value in input data
-        # self.feature_min_vector = []         # (list) min values in data per feature
-        # self.data_max = None                 # (float) max value in input data
-        # self.feature_max_vector = []         # (list) max values in data per feature
-
+                                             norm_method=norm_method)  # Normalization method
         # Data
-        self.num_of_train_samples = None  # (int) Number of train samples
+        self.num_of_train_samples = None     # (int) Number of train samples
         self.num_of_test_samples = None      # (int) Number of labels in test data-set
         self.train_data = np.array([])       # Hold train data
         self.test_data = np.array([])        # Holds test data
         self.train_labels = []               # Labels for train-data
         self.test_labels = []                # Labels for test-data
-
-        # Network architecture
-        self.input_shape = []  # Original shape of input data
-        self.output_layer_size = None          # Output layer size
-        self.input_layer_size = None         # Input layer size
-        self.network_architecture = None     # Network architecture
 
         # Visualization
         self.orig_images = []                # List holding the original images
@@ -102,7 +98,16 @@ class ANNet:
 
         # Optimizer
         self.optimizer = AdamOptimizer(self.network.weight, learning_rate=self.alpha)
-        self.use_optimizer = False
+
+    def __getattr__(self, item):
+        networkk_attribute = ['activation_func', 'bias', 'input_layer_size', 'input_shape', 'network_architecture',
+                              'output_func', 'output_layer_size', 'weight']
+        d = None
+        if item in networkk_attribute:
+            d = eval(f'self.network.{item}')
+        else:
+            raise AttributeError
+        return d
 
     def set_alpha(self, alpha):
         self.alpha = alpha
@@ -118,7 +123,7 @@ class ANNet:
         """
 
         theta = []
-        self.network_architecture = network_size
+        self.network.network_architecture = network_size
 
         if self.init_method == Initialization.EPSILON:
             for i in range(0, len(network_size)-1):
@@ -127,9 +132,9 @@ class ANNet:
                 theta.extend(t)
             self.Theta = theta
         else:
-            for i in range(len(self.network_architecture) - 1):
+            for i in range(len(self.network.network_architecture) - 1):
                 n = (network_size[i] + 1) * network_size[i + 1]
-                input_size = self.network_architecture[i]
+                input_size = self.network.network_architecture[i]
 
                 # He initialization
                 t = np.random.randn(1, n) * np.sqrt(2.0 / input_size)
@@ -155,12 +160,12 @@ class ANNet:
     def set_activation_function(self, activation_function: Union[int, str]):
         if isinstance(activation_function, int):
             try:
-                self.activation_func = ActivationFunction(activation_function)
+                self.network.activation_func = ActivationFunction(activation_function)
             except ValueError:
                 raise ValueError(f"Integer {activation_function} is not a valid value for Activation Function")
         elif isinstance(activation_function, str):
             try:
-                self.activation_func = ActivationFunction[activation_function.upper()]
+                self.network.activation_func = ActivationFunction[activation_function.upper()]
             except KeyError:
                 raise ValueError(f"String '{activation_function}' is not a valid activation function")
         else:
@@ -183,12 +188,12 @@ class ANNet:
     def set_output_activation(self, output: Union[int, str]):
         if isinstance(output, int):
             try:
-                self.output_func = ActivationFunction(output)
+                self.network.output_func = ActivationFunction(output)
             except ValueError:
                 raise ValueError(f"Integer {output} is not a valid value for Activation Function")
         elif isinstance(output, str):
             try:
-                self.output_func = ActivationFunction[output.upper()]
+                self.network.output_func = ActivationFunction[output.upper()]
             except KeyError:
                 raise ValueError(f"String '{output}' is not a valid activation function")
         else:
@@ -245,7 +250,7 @@ class ANNet:
                                             hidden layers and the output layer.
         :return:
         """
-        self.network_architecture = network_architecture
+        self.network.network_architecture = network_architecture
 
     def set_mnist_data(self):
         """ Imports the mnist data-set and assigns it to the train- & test-data. The mnist data-set is an open source
@@ -399,16 +404,16 @@ class ANNet:
         train_data = []
 
         if len(data.shape) == 3:
-            self.input_layer_size = data.shape[1] * data.shape[2]
+            self.network.input_layer_size = data.shape[1] * data.shape[2]
             self.num_of_train_samples = data.shape[0]
-            self.input_shape = [data.shape[1], data.shape[2]]
+            self.network.input_shape = [data.shape[1], data.shape[2]]
             # Reshape data
             for i in range(0, len(data)):
                 train_data.append(np.array(np.matrix.flatten(data[i])))
         elif len(data.shape) == 2:
-            self.input_layer_size = data.shape[1]
+            self.network.input_layer_size = data.shape[1]
             self.num_of_train_samples = data.shape[0]
-            self.input_shape = [1, data.shape[1]]
+            self.network.input_shape = [1, data.shape[1]]
             train_data = data
         train_data = self.normalize_data(np.array(train_data))
         self.train_data = train_data
@@ -425,12 +430,12 @@ class ANNet:
         test_data = []
         self.num_of_test_samples = data.shape[0]
         if len(data.shape) == 3:
-            self.input_shape = [data.shape[1], data.shape[2]]
+            self.network.input_shape = [data.shape[1], data.shape[2]]
             # Reshape data
             for i in range(0, len(data)):
                 test_data.append(np.matrix.flatten(data[i]))
         elif len(data.shape) == 2:
-            self.input_shape = [1, data.shape[1]]
+            self.network.input_shape = [1, data.shape[1]]
         test_data = self.normalize_data(np.array(test_data))
         self.test_data = np.array(test_data)
 
@@ -443,8 +448,8 @@ class ANNet:
         :return:
         """
         self.train_labels = labels
-        if 'self.output_layer_size' not in locals():
-            self.output_layer_size = len(np.unique(labels))
+        if 'self.network.output_layer_size' not in locals():
+            self.network.output_layer_size = len(np.unique(labels))
 
     def set_test_labels(self, labels):
         """ Assigns the provided labels to the labels of the test data-set. The method will also set the
@@ -455,8 +460,8 @@ class ANNet:
         :return:
         """
         self.test_labels = labels
-        if 'self.output_layer_size' not in locals():
-            self.output_layer_size = len(np.unique(labels))
+        if 'self.network.output_layer_size' not in locals():
+            self.network.output_layer_size = len(np.unique(labels))
 
     def draw_and_predict(self):
         """ The method will randomly pick a sample in the test data-set and makes a prediction by doing a forward
@@ -468,26 +473,26 @@ class ANNet:
         sample_idx = random.randint(0, self.test_data.shape[0])
         x = self.test_data[sample_idx, :]
         y = self.test_labels[sample_idx]
-        y_hat = np.zeros((self.output_layer_size, 1))
+        y_hat = np.zeros((self.network.output_layer_size, 1))
         y_hat[y] = 1
         h, c, a, z = ANNet.forward_propagation(self, x, y_hat)
         prediction = np.argmax(h)
         print("Network predicts value: " + str(prediction))
-        im = x.reshape(self.input_shape[0], self.input_shape[1])
+        im = x.reshape(self.network.input_shape[0], self.network.input_shape[1])
         plt.imshow(im)
         plt.show()
 
     def init_weights(self):
         # Initialize weights if they have not been initialized by user.
         if not self.Theta:
-            if self.network_architecture is None:
+            if self.network.network_architecture is None:
                 print("Network weights has not been initialized by user!, default hidden layer  of size " +
                       str(self.default_hidden_layer_size) + " has been applied")
-                input_layer_size = self.input_layer_size
-                output_layer_size = self.output_layer_size
+                input_layer_size = self.network.input_layer_size
+                output_layer_size = self.network.output_layer_size
                 network_architecture = [input_layer_size, self.default_hidden_layer_size, output_layer_size]
-                self.network_architecture = network_architecture
-            self.init_network_params(self.network_architecture)
+                self.network.network_architecture = network_architecture
+            self.init_network_params(self.network.network_architecture)
 
     def set_network_settings(self, settings: dict):
         if "normalization_method" in settings.keys():
@@ -522,7 +527,8 @@ class ANNet:
             z = np.dot(activations[-1], self.network.weight[i]) + self.network.bias[i]
             zs.append(z)  # Store the z value
             # Apply the activation function (sigmoid)
-            a = activate(self.activation_func, z) if i != len(self.network.weight) - 1 else activate(self.output_func, z)
+            a = activate(self.network.activation_func, z) if i != len(self.network.weight) - 1 else (
+                activate(self.network.output_func, z))
             activations.append(a)  # Store the activations
 
         return activations, zs, activations[-1]
@@ -542,7 +548,7 @@ class ANNet:
         # Calculate the error at the output layer (difference between prediction and true label)
         output_error = (activations[-1] - y)
         # Calculate delta for the output layer
-        deltas = [output_error * gradient(self.output_func, z_list[-1])]
+        deltas = [output_error * gradient(self.network.output_func, z_list[-1])]
 
         # Initialize gradients for biases and weights for each layer
         d_bias = [deltas[-1].mean(axis=0)]
@@ -551,7 +557,7 @@ class ANNet:
         # Iterate backwards through the network layers
         for l in reversed(range(len(self.network.weight) - 1)):
             z = z_list[l]
-            zp = gradient(self.activation_func, z)
+            zp = gradient(self.network.activation_func, z)
             delta = np.dot(deltas[-1], self.network.weight[l + 1].T) * zp
             deltas.append(delta)
             d_bias.append(delta.mean(axis=0))
@@ -601,12 +607,14 @@ class ANNet:
 
         z_list = []  # List to hold all sigmoid values
         for i, theta in enumerate(self.Theta):   # Forward propagate through all layers
-            t = theta.reshape(self.network_architecture[i]+1, self.network_architecture[i+1])  # Reshape parameter matrix
+            # Reshape parameter matrix
+            t = theta.reshape(self.network.network_architecture[i]+1, self.network.network_architecture[i+1])
 
             z = np.matmul(a, t)  # z = a*t
             z_list.append(z)     # Store the sigmoid values
 
-            a = activate(self.activation_func, z) if i != len(self.Theta) - 1 else activate(self.output_func, z)
+            a = activate(self.network.activation_func, z) if i != len(self.Theta) - 1 else (
+                activate(self.network.output_func, z))
 
             # add bias unit
             if num_of_samples > 1:
@@ -637,7 +645,8 @@ class ANNet:
         # Init weight gradient matrices
         theta_grad = []
         for iLayer, theta in enumerate(self.Theta):
-            theta = theta.reshape(self.network_architecture[iLayer] + 1, self.network_architecture[iLayer + 1])
+            theta = theta.reshape(self.network.network_architecture[iLayer] + 1,
+                                  self.network.network_architecture[iLayer + 1])
             theta_grad.append(np.zeros(theta.shape))
 
         for iLayer in range(len(a_mat) - 1, -1, -1):
@@ -645,15 +654,16 @@ class ANNet:
             if not iLayer == len(a_mat) - 1:
                 index = iLayer + 1
                 theta = self.Theta[index]
-                t = theta.reshape(self.network_architecture[index] + 1, self.network_architecture[index + 1])
+                t = theta.reshape(self.network.network_architecture[index] + 1,
+                                  self.network.network_architecture[index + 1])
                 t = t[1:, :]
 
                 delta_weight = np.dot(t, delta.T)
-                sig_z = gradient(self.activation_func, z)
+                sig_z = gradient(self.network.activation_func, z)
                 delta = delta_weight * sig_z.T
                 delta = delta.T
             else:
-                delta = delta * gradient(self.output_func, z)
+                delta = delta * gradient(self.network.output_func, z)
 
             a = a_mat[iLayer]
             th_grad = np.dot(a.T, delta)
@@ -697,14 +707,14 @@ class ANNet:
 
         # Initialize weights if they have not been initialized by user.
         if not self.Theta:
-            if self.network_architecture is None:
+            if self.network.network_architecture is None:
                 print("Network weights has not been initialized by user!, default hidden layer  of size " +
                       str(self.default_hidden_layer_size) + " has been applied")
-                input_layer_size = self.input_layer_size
-                output_layer_size = self.output_layer_size
+                input_layer_size = self.network.input_layer_size
+                output_layer_size = self.network.output_layer_size
                 network_architecture = [input_layer_size, self.default_hidden_layer_size, output_layer_size]
-                self.network_architecture = network_architecture
-            self.init_network_params(self.network_architecture)
+                self.network.network_architecture = network_architecture
+            self.init_network_params(self.network.network_architecture)
 
         # Preparing label data, every sample will be represented by a vector with the size equal to the number of
         # unique classes in the training data. The correct classification will be marked by a one while the false
@@ -716,7 +726,7 @@ class ANNet:
             # for i, val in enumerate(y):
             #    y_mat[i][int(val)] = 1
         elif y.shape[0] == 1 or y.shape[1] == 1:
-            y_mat = np.zeros((y.shape[0], self.output_layer_size))
+            y_mat = np.zeros((y.shape[0], self.network.output_layer_size))
             for i, val in enumerate(y):
                 y_mat[i][int(val)] = 1
         else:
@@ -728,7 +738,8 @@ class ANNet:
             # Init weight gradient matrices
             theta_grad = []
             for iLayer, theta in enumerate(self.Theta):
-                theta = theta.reshape(self.network_architecture[iLayer]+1, self.network_architecture[iLayer+1])
+                theta = theta.reshape(self.network.network_architecture[iLayer]+1,
+                                      self.network.network_architecture[iLayer+1])
                 theta_grad.append(np.zeros(theta.shape))
 
             h_mat, c, a_mat, z_mat = ANNet.forward_propagation(self, x, y_mat)  # Forward propagate
@@ -741,15 +752,16 @@ class ANNet:
                 if not iLayer == len(a_mat)-1:
                     index = iLayer + 1
                     theta = self.Theta[index]
-                    t = theta.reshape(self.network_architecture[index] + 1, self.network_architecture[index + 1])
+                    t = theta.reshape(self.network.network_architecture[index] + 1,
+                                      self.network.network_architecture[index + 1])
                     t = t[1:, :]
 
                     delta_weight = np.dot(t, delta.T)
-                    sig_z = gradient(self.activation_func, z)
+                    sig_z = gradient(self.network.activation_func, z)
                     delta = delta_weight * sig_z.T
                     delta = delta.T
                 else:
-                    delta = delta * gradient(self.output_func, z)
+                    delta = delta * gradient(self.network.output_func, z)
 
                 a = a_mat[iLayer]
                 th_grad = np.dot(a.T, delta)
@@ -814,7 +826,7 @@ class ANNet:
             if self.is_mnist:
                 data = {'picture': picture,
                         'theta': self.Theta,
-                        'network_size': self.network_architecture,
+                        'network_size': self.network.network_architecture,
                         'a': a_test,
                         'z': z_test,
                         'prediction': h_test}
@@ -936,8 +948,8 @@ class ANNet:
                 classification_result = outcome[picture_idx]
                 border_thickness = 4
 
-                m = self.input_shape[0] + 2*border_thickness
-                n = self.input_shape[1] + 2*border_thickness
+                m = self.network.input_shape[0] + 2*border_thickness
+                n = self.network.input_shape[1] + 2*border_thickness
                 validation_image = np.zeros((num_of_pics_m * m,
                                              num_of_pics_n * n,
                                              3))
@@ -1080,7 +1092,8 @@ class ANNet:
         network_architecture = []
         i_layer = len(theta)
         for i_layer, t in enumerate(theta):
-            theta[i_layer] = t.reshape(self.network_architecture[i_layer] + 1, self.network_architecture[i_layer + 1])
+            theta[i_layer] = t.reshape(self.network.network_architecture[i_layer] + 1,
+                                       self.network.network_architecture[i_layer + 1])
             network_architecture.append(theta[i_layer].shape[0])
         network_architecture.append(theta[i_layer].shape[1])
 
