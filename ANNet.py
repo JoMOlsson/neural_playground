@@ -31,6 +31,7 @@ except ModuleNotFoundError:
 # TODO - ADD SAVE METHOD
 # TODO - ADD LOAD METHOD
 # TODO - CHECK OPTIMIZER
+# TODO - WHY IS NETWORK_ARCHITECTURE AND NETWORK_SIZE
 
 
 class Normalization(Enum):
@@ -54,18 +55,25 @@ class ANNet:
 
         # Network
         self.Theta = []  # Holding weight matrices
-        self.network = SimpleNamespace(weight=[], bias=[])
+        self.network = SimpleNamespace(weight=[],
+                                       bias=[])
 
         # Normalization
-        self.feature_mean_vector = []        # (list) average values in data per feature
-        self.feature_var_vector = []         # (list) variance values in data per feature
-        self.data_min = None                 # (float) min value in input data
-        self.feature_min_vector = []         # (list) min values in data per feature
-        self.data_max = None                 # (float) max value in input data
-        self.feature_max_vector = []         # (list) max values in data per feature
-        self.num_of_train_samples = None     # (int) Number of train samples
+        self.normalization = SimpleNamespace(feature_mean_vector=[],  # (list) average values in data per feature
+                                             feature_var_vector=[],  # (list) variance values in data per feature
+                                             feature_min_vector=[],  # (list) min values in data per feature
+                                             feature_max_vector=[],  # (list) max values in data per feature
+                                             data_min=[],            # (float) min value in input data
+                                             data_max=[])            # (float) max value in input data
+        # self.feature_mean_vector = []        # (list) average values in data per feature
+        # self.feature_var_vector = []         # (list) variance values in data per feature
+        # self.data_min = None                 # (float) min value in input data
+        # self.feature_min_vector = []         # (list) min values in data per feature
+        # self.data_max = None                 # (float) max value in input data
+        # self.feature_max_vector = []         # (list) max values in data per feature
 
         # Data
+        self.num_of_train_samples = None  # (int) Number of train samples
         self.num_of_test_samples = None      # (int) Number of labels in test data-set
         self.train_data = np.array([])       # Hold train data
         self.test_data = np.array([])        # Holds test data
@@ -288,35 +296,35 @@ class ANNet:
             feat_axis = 1
 
         # Assign mean per feature
-        if 'self.feature_mean_vector' not in locals():
+        if 'self.normalization.feature_mean_vector' not in locals():
             feature_mean_vector = []
             for iFeat in range(0, data.shape[feat_axis]):
                 feature_mean_vector.append(np.mean(data[:, iFeat]))
-            self.feature_mean_vector = feature_mean_vector
+            self.normalization.feature_mean_vector = feature_mean_vector
 
         # Extract variance per feature
-        if 'self.feature_var_vector' not in locals():
+        if 'self.normalization.feature_var_vector' not in locals():
             feature_var_vector = []
             for iFeat in range(0, data.shape[feat_axis]):
                 d = data[:, iFeat]
                 feature_var_vector.append(np.var(d))
-            self.feature_var_vector = feature_var_vector
+            self.normalization.feature_var_vector = feature_var_vector
 
         # Extract min values per feature
-        if 'self.feature_min_vector' not in locals():
-            self.data_min = np.min(np.min(data))
+        if 'self.normalization.feature_min_vector' not in locals():
+            self.normalization.data_min = np.min(np.min(data))
             feature_min_vector = []
             for iFeat in range(0, data.shape[feat_axis]):
                 feature_min_vector.append(np.min(data[:, iFeat]))
-            self.feature_min_vector = feature_min_vector
+            self.normalization.feature_min_vector = feature_min_vector
 
         # Extract max values per feature
-        if 'self.feature_max_vector' not in locals():
-            self.data_max = np.max(np.max(data))
+        if 'self.normalization.feature_max_vector' not in locals():
+            self.normalization.data_max = np.max(np.max(data))
             feature_max_vector = []
             for iFeat in range(0, data.shape[feat_axis]):
                 feature_max_vector.append(np.max(data[:, iFeat]))
-            self.feature_max_vector = feature_max_vector
+            self.normalization.feature_max_vector = feature_max_vector
 
         # ----- Normalize data -----
 
@@ -324,8 +332,9 @@ class ANNet:
         if self.norm_method == Normalization.MINMAX:
             for iFeat in range(0, data.shape[feat_axis]):
                 d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
-                d_norm = ((2 * (d - self.feature_min_vector[iFeat])) /
-                          (self.feature_max_vector[iFeat] - self.feature_min_vector[iFeat]) - 1)
+                d_norm = ((2 * (d - self.normalization.feature_min_vector[iFeat])) /
+                          (self.normalization.feature_max_vector[iFeat] -
+                           self.normalization.feature_min_vector[iFeat]) - 1)
 
                 if feat_axis:
                     data[:, iFeat] = d_norm
@@ -335,7 +344,7 @@ class ANNet:
         elif self.norm_method == Normalization.ZSCORE:
             for iFeat in range(0, data.shape[feat_axis]):
                 d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
-                d_norm = (d - self.feature_mean_vector[iFeat]) / self.feature_var_vector[iFeat]
+                d_norm = (d - self.normalization.feature_mean_vector[iFeat]) / self.normalization.feature_var_vector[iFeat]
 
                 if feat_axis:
                     data[:, iFeat] = d_norm
@@ -345,7 +354,8 @@ class ANNet:
         elif self.norm_method == Normalization.MINMAX_ALL:
             for iFeat in range(0, data.shape[0]):
                 d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
-                d_norm = (2*(d - self.data_min)) / (self.data_max - self.data_min) - 1
+                d_norm = ((2*(d - self.normalization.data_min)) /
+                          (self.normalization.data_max - self.normalization.data_min) - 1)
 
                 if feat_axis:
                     data[:, iFeat] = d_norm
@@ -355,7 +365,8 @@ class ANNet:
         elif self.norm_method == Normalization.MINMAX_OLD:
             for iData in range(0, data.shape[0]):
                 d = np.array(data[iData, :])
-                d_norm = (2*(d - self.data_min)) / (self.data_max - self.data_min) - 1
+                d_norm = (2*(d - self.normalization.data_min)) / (self.normalization.data_max
+                                                                  - self.normalization.data_min) - 1
                 data[iData, :] = d_norm
 
         return data
@@ -374,7 +385,8 @@ class ANNet:
         # ----- Reverse Normalize data -----
         for iData in range(0, data.shape[0]):
             d = np.array(data[iData, :])
-            d_unnorm = ((d + 1) * (self.data_max - self.data_min)) / 2 + self.data_min
+            d_unnorm = (((d + 1) * (self.normalization.data_max - self.normalization.data_min)) / 2
+                        + self.normalization.data_min)
             data[iData, :] = d_unnorm
         return data
 
