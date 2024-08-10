@@ -28,9 +28,6 @@ except ModuleNotFoundError:
 # TODO - CHECK HOW TO SET SETTINGS CONVENIENTLY
 # TODO - MOVE VISUALIZATION
 # TODO - RE WRITE TRAINING AND REMOVE DEPRECATED
-# TODO - ADD SAVE METHOD
-# TODO - ADD LOAD METHOD
-# TODO - CHECK OPTIMIZER
 
 
 class Normalization(Enum):
@@ -118,26 +115,25 @@ class ANNet:
             raise AttributeError
         return d
 
-    """
-    def __setattr__(self, key, value):
-        network_attribute = ['activation_func', 'bias', 'input_layer_size', 'input_shape', 'network_architecture',
-                             'output_func', 'output_layer_size', 'weight']
-        param_attribute = ['alpha', 'default_hidden_layer_size', 'epsilon', 'use_optimizer']
-        norm_attribute = ['feature_mean_vector', 'feature_var_vector', 'feature_min_vector',
-                          'feature_max_vector', 'data_min', 'data_max', 'norm_method']
-        data_attribute = ['num_of_train_samples', 'num_of_test_samples', 'train_data',
-                          'test_data', 'train_labels', 'test_labels']
-        if key in network_attribute:
-            exec(f'self.network.{key} = value')
-        elif key in param_attribute:
-            exec(f'self.params.{key} = value')
-        elif key in norm_attribute:
-            exec(f'self.normalization.{key} = value')
-        elif key in data_attribute:
-            exec(f'self.data.{key} = value')
-        else:
-            exec(f'self.{key} = value')
-    """
+    def save(self, save_dir: str = '.'):
+        data = {
+            'theta': self.Theta,
+            'network': self.network,
+            'params': self.params,
+            'data': self.data,
+            'normalization': self.normalization,
+            'optimizer': self.optimizer
+                }
+        np.save(os.path.join(save_dir, 'network.npy'), data)  # save to npy file
+
+    def load_network(self, load_dir: str):
+        data = np.load(load_dir, allow_pickle=True)
+        self.network = data.item().get('network')
+        self.params = data.item().get('params')
+        self.data = data.item().get('data')
+        self.normalization = data.item().get('normalization')
+        self.optimizer = data.item().get('optimizer')
+        self.Theta = data.item().get('theta')
 
     def set_alpha(self, alpha):
         self.params.alpha = alpha
@@ -800,7 +796,7 @@ class ANNet:
             # Update weights from the weight gradients
             if self.params.use_optimizer:
                 self.optimizer.set_parameters(self.Theta)
-                self.Theta = self.optimizer.step(theta_grad)
+                self.Theta = self.optimizer.step(theta_grad, flatten=True)
             else:
                 for i, theta_val in enumerate(theta_grad):
                     theta_grad[i] = (1/num_of_samples)*theta_val
