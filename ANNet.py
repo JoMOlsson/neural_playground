@@ -667,44 +667,6 @@ class ANNet:
 
         return h, c, a_list, z_list
 
-    def back_propagation(self, delta, z_mat, a_mat):
-        # Init weight gradient matrices
-        theta_grad = []
-        for iLayer, theta in enumerate(self.Theta):
-            theta = theta.reshape(self.network.network_architecture[iLayer] + 1,
-                                  self.network.network_architecture[iLayer + 1])
-            theta_grad.append(np.zeros(theta.shape))
-
-        for iLayer in range(len(a_mat) - 1, -1, -1):
-            z = z_mat[iLayer]
-            if not iLayer == len(a_mat) - 1:
-                index = iLayer + 1
-                theta = self.Theta[index]
-                t = theta.reshape(self.network.network_architecture[index] + 1,
-                                  self.network.network_architecture[index + 1])
-                t = t[1:, :]
-
-                delta_weight = np.dot(t, delta.T)
-                sig_z = gradient(self.network.activation_func, z)
-                delta = delta_weight * sig_z.T
-                delta = delta.T
-            else:
-                delta = delta * gradient(self.network.output_func, z)
-
-            a = a_mat[iLayer]
-            th_grad = np.dot(a.T, delta)
-            theta_grad[iLayer] += th_grad
-
-        # Update weights from the weight gradients
-        if self.params.use_optimizer and False:
-            self.optimizer.set_parameters(self.Theta)
-            self.Theta = self.optimizer.step(theta_grad)
-        else:
-            for i, theta_val in enumerate(theta_grad):
-                theta_grad[i] = (1 / len(delta)) * theta_val
-                t = self.params.alpha * theta_grad[i]
-                self.Theta[i] -= t.flatten()
-
     def train_network(self, x=None, y=None, num_of_iterations=1000, visualize_training=False):
         """ The method will initialize a training session with a number of training iterations determined by the
             variable num_of_iterations (int). The network will be trained using the x data as input data and the
