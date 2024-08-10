@@ -11,24 +11,19 @@ from types import SimpleNamespace
 
 try:
     from utils.activation import activate, gradient, ActivationFunction
+    from utils.normalization import Normalization, normalize
     from utils.opimizer.adam import AdamOptimizer
+    from utils.visual.visualize import animate_training, create_gif_from_dump
 except ModuleNotFoundError:
     from .utils.activation import activate, gradient, ActivationFunction
+    from .utils.normalization import Normalization, normalize
     from .utils.opimizer.adam import AdamOptimizer
-
-from utils.visual.visualize import animate_training, create_gif_from_dump
+    from .utils.visual.visualize import animate_training, create_gif_from_dump
 
 # TODO - Move normalization
 # TODO - CLEAN UP CODE
 # TODO - CHECK HOW TO SET SETTINGS CONVENIENTLY
 # TODO - RE WRITE TRAINING AND REMOVE DEPRECATED
-
-
-class Normalization(Enum):
-    MINMAX = 1
-    ZSCORE = 2
-    MINMAX_ALL = 3
-    MINMAX_OLD = 4
 
 
 class Initialization(Enum):
@@ -283,94 +278,22 @@ class ANNet:
         :param data_axis: (int) Determines which axis should be considered to be the data axis
         :return data: (npArray) Normalized data
         """
-        data = np.array(data)
-        data = data.astype('float64')
+        norm_data = normalize(self.normalization.norm_method, data, data_axis,
+                              self.normalization.feature_mean_vector,
+                              self.normalization.feature_var_vector,
+                              self.normalization.feature_min_vector,
+                              self.normalization.feature_max_vector,
+                              self.normalization.data_min,
+                              self.normalization.data_max)
 
-        # Set data and feature axis
-        if data_axis is None:
-            if data.shape[0] > data.shape[1]:
-                data_axis = 0
-                feat_axis = 1
-            else:
-                data_axis = 1
-                feat_axis = 0
-        else:
-            feat_axis = 1
-
-        # Assign mean per feature
-        if 'self.normalization.feature_mean_vector' not in locals():
-            feature_mean_vector = []
-            for iFeat in range(0, data.shape[feat_axis]):
-                feature_mean_vector.append(np.mean(data[:, iFeat]))
-            self.normalization.feature_mean_vector = feature_mean_vector
-
-        # Extract variance per feature
-        if 'self.normalization.feature_var_vector' not in locals():
-            feature_var_vector = []
-            for iFeat in range(0, data.shape[feat_axis]):
-                d = data[:, iFeat]
-                feature_var_vector.append(np.var(d))
-            self.normalization.feature_var_vector = feature_var_vector
-
-        # Extract min values per feature
-        if 'self.normalization.feature_min_vector' not in locals():
-            self.normalization.data_min = np.min(np.min(data))
-            feature_min_vector = []
-            for iFeat in range(0, data.shape[feat_axis]):
-                feature_min_vector.append(np.min(data[:, iFeat]))
-            self.normalization.feature_min_vector = feature_min_vector
-
-        # Extract max values per feature
-        if 'self.normalization.feature_max_vector' not in locals():
-            self.normalization.data_max = np.max(np.max(data))
-            feature_max_vector = []
-            for iFeat in range(0, data.shape[feat_axis]):
-                feature_max_vector.append(np.max(data[:, iFeat]))
-            self.normalization.feature_max_vector = feature_max_vector
-
-        # ----- Normalize data -----
-
-        # MINMAX
-        if self.normalization.norm_method == Normalization.MINMAX:
-            for iFeat in range(0, data.shape[feat_axis]):
-                d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
-                d_norm = ((2 * (d - self.normalization.feature_min_vector[iFeat])) /
-                          (self.normalization.feature_max_vector[iFeat] -
-                           self.normalization.feature_min_vector[iFeat]) - 1)
-
-                if feat_axis:
-                    data[:, iFeat] = d_norm
-                else:
-                    data[iFeat, :] = d_norm
-        # Z-SCORE
-        elif self.normalization.norm_method == Normalization.ZSCORE:
-            for iFeat in range(0, data.shape[feat_axis]):
-                d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
-                d_norm = (d - self.normalization.feature_mean_vector[iFeat]) / self.normalization.feature_var_vector[iFeat]
-
-                if feat_axis:
-                    data[:, iFeat] = d_norm
-                else:
-                    data[iFeat, :] = d_norm
-        # MIN MAX ALL
-        elif self.normalization.norm_method == Normalization.MINMAX_ALL:
-            for iFeat in range(0, data.shape[0]):
-                d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
-                d_norm = ((2*(d - self.normalization.data_min)) /
-                          (self.normalization.data_max - self.normalization.data_min) - 1)
-
-                if feat_axis:
-                    data[:, iFeat] = d_norm
-                else:
-                    data[iFeat, :] = d_norm
-        # DEPRECATED
-        elif self.normalization.norm_method == Normalization.MINMAX_OLD:
-            for iData in range(0, data.shape[0]):
-                d = np.array(data[iData, :])
-                d_norm = (2*(d - self.normalization.data_min)) / (self.normalization.data_max
-                                                                  - self.normalization.data_min) - 1
-                data[iData, :] = d_norm
-
+        # Unpack data
+        data = norm_data['data']
+        self.normalization.feature_mean_vector = norm_data['feature_mean_vector']
+        self.normalization.feature_var_vector = norm_data['feature_var_vector']
+        self.normalization.feature_min_vector = norm_data['feature_min_vector']
+        self.normalization.feature_max_vector = norm_data['feature_max_vector']
+        self.normalization.data_min = norm_data['data_min']
+        self.normalization.data_max = norm_data['data_max']
         return data
 
     def reverse_normalization(self, data):
