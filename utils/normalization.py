@@ -19,7 +19,13 @@ def normalize(function: Normalization,
 
     :param function: (Normalization) Desired Normalization method
     :param data:  (npArray) Numpy array corresponding to the data to be used within the neural network
-    :param norm_params: (SimpleNamespace)
+    :param norm_params (SimpleNamespace)
+                feature_mean_vector=[],  # (list) average values in data per feature
+                feature_var_vector=[],   # (list) variance values in data per feature
+                feature_min_vector=[],   # (list) min values in data per feature
+                feature_max_vector=[],   # (list) max values in data per feature
+                data_min=[],             # (float) min value in input data
+                data_max=[],             # (float) max value in input data
     :param data_axis: (int) Determines which axis should be considered to be the data axis and
      which should be the feature axis
 
@@ -90,6 +96,12 @@ def denormalize(function: Normalization,
     :param function: (Normalization) Desired De-normalization method
     :param data:  (npArray) Numpy array corresponding to the data to be used within the neural network
     :param norm_params (SimpleNamespace)
+                feature_mean_vector=[],  # (list) average values in data per feature
+                feature_var_vector=[],   # (list) variance values in data per feature
+                feature_min_vector=[],   # (list) min values in data per feature
+                feature_max_vector=[],   # (list) max values in data per feature
+                data_min=[],             # (float) min value in input data
+                data_max=[],             # (float) max value in input data
     :return data: (npArray) Un-Normalized data
     """
     data = np.array(data)
@@ -113,6 +125,20 @@ def denormalize(function: Normalization,
 
 
 def norm_minmax(data: np.ndarray, norm_params: SimpleNamespace, feat_axis: int = 0):
+    """ Normalizes every feature to the range of -1 to 1 by using the mean and max per feature
+
+    :param data:  (npArray) Numpy array corresponding to the data to be used within the neural network
+    :param norm_params (SimpleNamespace)
+                feature_mean_vector=[],  # (list) average values in data per feature
+                feature_var_vector=[],   # (list) variance values in data per feature
+                feature_min_vector=[],   # (list) min values in data per feature
+                feature_max_vector=[],   # (list) max values in data per feature
+                data_min=[],             # (float) min value in input data
+                data_max=[],             # (float) max value in input data
+    :param feat_axis (int) Axis to be considered the feature axis, other axis will be the data axis.
+
+    return data (npArray) Normalized data
+    """
     for iFeat in range(0, data.shape[feat_axis]):
         d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
         d_norm = ((2 * (d - norm_params.feature_min_vector[iFeat])) /
@@ -126,6 +152,19 @@ def norm_minmax(data: np.ndarray, norm_params: SimpleNamespace, feat_axis: int =
 
 
 def denorm_minmax(data: np.ndarray, norm_params: SimpleNamespace):
+    """ De-normalizes every feature from the range of -1 to 1 by using the mean and max per feature
+
+    :param data:  (npArray) Numpy array corresponding to the data to be used within the neural network
+    :param norm_params (SimpleNamespace)
+                feature_mean_vector=[],  # (list) average values in data per feature
+                feature_var_vector=[],   # (list) variance values in data per feature
+                feature_min_vector=[],   # (list) min values in data per feature
+                feature_max_vector=[],   # (list) max values in data per feature
+                data_min=[],             # (float) min value in input data
+                data_max=[],             # (float) max value in input data
+
+    return data (npArray) Denormalized data
+    """
     # ----- Reverse Normalize data -----
     for iData in range(0, data.shape[0]):
         d = np.array(data[iData, :])
@@ -135,6 +174,20 @@ def denorm_minmax(data: np.ndarray, norm_params: SimpleNamespace):
 
 
 def norm_zscore(data: np.ndarray, norm_params: SimpleNamespace, feat_axis: int = 0):
+    """ Normalizes the given data using the Z-score method
+
+    :param data:  (npArray) Numpy array corresponding to the data to be used within the neural network
+    :param norm_params (SimpleNamespace)
+                feature_mean_vector=[],  # (list) average values in data per feature
+                feature_var_vector=[],   # (list) variance values in data per feature
+                feature_min_vector=[],   # (list) min values in data per feature
+                feature_max_vector=[],   # (list) max values in data per feature
+                data_min=[],             # (float) min value in input data
+                data_max=[],             # (float) max value in input data
+    :param feat_axis (int) Axis to be considered the feature axis, other axis will be the data axis.
+
+    return data (npArray) Normalized data
+    """
     for iFeat in range(0, data.shape[feat_axis]):
         d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
         d_norm = (d - norm_params.feature_mean_vector[iFeat]) / norm_params.feature_var_vector[iFeat]
@@ -147,6 +200,20 @@ def norm_zscore(data: np.ndarray, norm_params: SimpleNamespace, feat_axis: int =
 
 
 def denorm_zscore(data: np.ndarray, norm_params: SimpleNamespace, feat_axis: int = 0):
+    """ De-normalizes the given data using the Z-score method
+
+    :param data:  (npArray) Numpy array corresponding to the data to be used within the neural network
+    :param norm_params (SimpleNamespace)
+                feature_mean_vector=[],  # (list) average values in data per feature
+                feature_var_vector=[],   # (list) variance values in data per feature
+                feature_min_vector=[],   # (list) min values in data per feature
+                feature_max_vector=[],   # (list) max values in data per feature
+                data_min=[],             # (float) min value in input data
+                data_max=[],             # (float) max value in input data
+    :param feat_axis (int) Axis to be considered the feature axis, other axis will be the data axis.
+
+    return data (npArray) Denormalized data
+    """
     for iFeat in range(0, data.shape[feat_axis]):
         d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
         d_unnorm = d * norm_params.feature_var_vector[iFeat] + norm_params.feature_mean_vector[iFeat]
@@ -158,6 +225,20 @@ def denorm_zscore(data: np.ndarray, norm_params: SimpleNamespace, feat_axis: int
 
 
 def norm_minmax_all(data: np.ndarray, norm_params: SimpleNamespace, feat_axis: int = 0):
+    """ Normalizes every feature to the range of -1 to 1 by using the mean and max for all features
+
+    :param data:  (npArray) Numpy array corresponding to the data to be used within the neural network
+    :param norm_params (SimpleNamespace)
+                feature_mean_vector=[],  # (list) average values in data per feature
+                feature_var_vector=[],   # (list) variance values in data per feature
+                feature_min_vector=[],   # (list) min values in data per feature
+                feature_max_vector=[],   # (list) max values in data per feature
+                data_min=[],             # (float) min value in input data
+                data_max=[],             # (float) max value in input data
+    :param feat_axis (int) Axis to be considered the feature axis, other axis will be the data axis.
+
+    return data (npArray) Normalized data
+    """
     for iFeat in range(0, data.shape[0]):
         d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
         d_norm = ((2 * (d - norm_params.data_min)) / (norm_params.data_max - norm_params.data_min) - 1)
@@ -170,6 +251,20 @@ def norm_minmax_all(data: np.ndarray, norm_params: SimpleNamespace, feat_axis: i
 
 
 def denorm_minmax_all(data: np.ndarray, norm_params: SimpleNamespace, feat_axis: int = 0):
+    """ De-normalizes every feature from the range of -1 to 1 by using the mean and max for all features
+
+    :param data:  (npArray) Numpy array corresponding to the data to be used within the neural network
+    :param norm_params (SimpleNamespace)
+                feature_mean_vector=[],  # (list) average values in data per feature
+                feature_var_vector=[],   # (list) variance values in data per feature
+                feature_min_vector=[],   # (list) min values in data per feature
+                feature_max_vector=[],   # (list) max values in data per feature
+                data_min=[],             # (float) min value in input data
+                data_max=[],             # (float) max value in input data
+    :param feat_axis (int) Axis to be considered the feature axis, other axis will be the data axis.
+
+    return data (npArray) Denormalized data
+    """
     for iFeat in range(0, data.shape[0]):
         d = np.array(data[:, iFeat]) if feat_axis else np.array(data[iFeat, :])
         d_unorm = ((d + 1) * (norm_params.data_max - norm_params.data_min)) / 2 + norm_params.data_min
