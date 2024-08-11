@@ -20,7 +20,6 @@ except ModuleNotFoundError:
     from .utils.opimizer.adam import AdamOptimizer
     from .utils.visual.visualize import animate_training, create_gif_from_dump
 
-# TODO - Move normalization
 # TODO - CLEAN UP CODE
 # TODO - CHECK HOW TO SET SETTINGS CONVENIENTLY
 # TODO - RE WRITE TRAINING AND REMOVE DEPRECATED
