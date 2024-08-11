@@ -278,22 +278,7 @@ class ANNet:
         :param data_axis: (int) Determines which axis should be considered to be the data axis
         :return data: (npArray) Normalized data
         """
-        norm_data = normalize(self.normalization.norm_method, data, data_axis,
-                              self.normalization.feature_mean_vector,
-                              self.normalization.feature_var_vector,
-                              self.normalization.feature_min_vector,
-                              self.normalization.feature_max_vector,
-                              self.normalization.data_min,
-                              self.normalization.data_max)
-
-        # Unpack data
-        data = norm_data['data']
-        self.normalization.feature_mean_vector = norm_data['feature_mean_vector']
-        self.normalization.feature_var_vector = norm_data['feature_var_vector']
-        self.normalization.feature_min_vector = norm_data['feature_min_vector']
-        self.normalization.feature_max_vector = norm_data['feature_max_vector']
-        self.normalization.data_min = norm_data['data_min']
-        self.normalization.data_max = norm_data['data_max']
+        data = normalize(self.normalization.norm_method, data, self.normalization, data_axis)
         return data
 
     def reverse_normalization(self, data):
