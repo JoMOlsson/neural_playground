@@ -11,12 +11,12 @@ from types import SimpleNamespace
 
 try:
     from utils.activation import activate, gradient, ActivationFunction
-    from utils.normalization import Normalization, normalize
+    from utils.normalization import Normalization, normalize, denormalize
     from utils.opimizer.adam import AdamOptimizer
     from utils.visual.visualize import animate_training, create_gif_from_dump
 except ModuleNotFoundError:
     from .utils.activation import activate, gradient, ActivationFunction
-    from .utils.normalization import Normalization, normalize
+    from .utils.normalization import Normalization, normalize, denormalize
     from .utils.opimizer.adam import AdamOptimizer
     from .utils.visual.visualize import animate_training, create_gif_from_dump
 
@@ -281,23 +281,14 @@ class ANNet:
         data = normalize(self.normalization.norm_method, data, self.normalization, data_axis)
         return data
 
-    def reverse_normalization(self, data):
+    def de_normalize_data(self, data):
         """ Takes the provided data and un-normalizes it using the min and the max values of the data.
-
-        TODO - IMPLEMENT FOR ALL NORMALIZATION METHODS
 
         :param data:  (npArray) Numpy array corresponding to the data to be used within the neural network
         :return data: (npArray) Un-Normalized data
         """
-        data = np.array(data)
-        data = data.astype('float64')
+        data = denormalize(self.normalization.norm_method, data, self.normalization)
 
-        # ----- Reverse Normalize data -----
-        for iData in range(0, data.shape[0]):
-            d = np.array(data[iData, :])
-            d_unnorm = (((d + 1) * (self.normalization.data_max - self.normalization.data_min)) / 2
-                        + self.normalization.data_min)
-            data[iData, :] = d_unnorm
         return data
 
     def set_train_data(self, data):
