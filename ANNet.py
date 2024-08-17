@@ -91,6 +91,8 @@ class ANNet:
     def __getattr__(self, item):
         """ Finds the desired attribute by searching in the class NameSpaces
 
+        :param item (str) Name of desired attribute to be fetched
+
         """
         network_attribute = ['activation_func', 'bias', 'input_layer_size', 'input_shape', 'network_architecture',
                              'output_func', 'output_layer_size', 'weight']
@@ -114,8 +116,8 @@ class ANNet:
     def save(self, save_dir: str = '.', file_name: str = 'network'):
         """ Saves the current state of the network to the directory specified in save_dir
 
-        param: save_dir (str) Desired path where saved network should be stored
-        param: file_name (str) Name of file
+        :param save_dir: (str) Desired path where saved network should be stored
+        :param file_name: (str) Name of file
         """
         data = {
             'theta': self.Theta,
@@ -129,6 +131,8 @@ class ANNet:
 
     def load_network(self, load_dir: str):
         """ Loads a previously saved network
+
+        :param load_dir: (str) Directory to model to be loaded
 
         """
         data = np.load(load_dir, allow_pickle=True)
@@ -194,7 +198,7 @@ class ANNet:
         self.optimizer = AdamOptimizer(self.network.weight, learning_rate=self.params.alpha)
 
     def init_weights(self):
-        """
+        """ Deprecated method for setting the weights
 
         """
         # Initialize weights if they have not been initialized by user.
@@ -210,6 +214,11 @@ class ANNet:
         self.optimizer = AdamOptimizer(self.network.weight, learning_rate=self.params.alpha)
 
     def set_network_settings(self, settings: dict):
+        """ Given a settings dictionary the method will assign the containing values to
+            the model.
+
+        :param settings (dict) A dictionary with network settings
+        """
         if "normalization_method" in settings.keys():
             self.set_normalization_method(settings["normalization_method"])
 
@@ -226,6 +235,11 @@ class ANNet:
             self.set_output_activation(settings["output_activation"])
 
     def set_activation_function(self, activation_function: Union[int, str]):
+        """ Assigns the given activation function to the model.
+            The input can either be a string value or an integer in the ActivationFunction Enum class.
+
+        :param activation_function: (int, str) Desired activation function
+        """
         if isinstance(activation_function, int):
             try:
                 self.network.activation_func = ActivationFunction(activation_function)
@@ -240,6 +254,12 @@ class ANNet:
             raise TypeError("Input must be an integer or a string")
 
     def set_init_function(self, init: Union[int, str]):
+        """ Assigns the given activation function to the model.
+            The input can either be a string value or an integer in the InitFunction Enum class.
+
+        :param init: (int, str) Desired init function
+        """
+
         if isinstance(init, int):
             try:
                 self.network.init_method = Initialization(init)
@@ -254,6 +274,13 @@ class ANNet:
             raise TypeError("Input must be an integer or a string")
 
     def set_output_activation(self, output: Union[int, str]):
+        """ Assigns the given output function to the model.
+            The input can either be a string value or an integer in the ActivationFunction Enum class.
+
+
+        :param output: (int, str) Desired output function
+        """
+
         if isinstance(output, int):
             try:
                 self.network.output_func = ActivationFunction(output)
@@ -268,6 +295,12 @@ class ANNet:
             raise TypeError("Input must be an integer or a string")
 
     def set_normalization_method(self, norm_method: Union[int, str]):
+        """ Assigns the given normalization function to the model.
+            The input can either be a string value or an integer in the NormalizationFunction Enum class.
+
+        :param norm_method: (int, str) Desired Normalization function
+        """
+
         if isinstance(norm_method, int):
             try:
                 self.normalization.norm_method = Normalization(norm_method)
@@ -437,9 +470,16 @@ class ANNet:
 
     @staticmethod
     def calc_mse(true_value: np.ndarray, prediction: np.ndarray):
+        """ Calculates the mean square error between the true value and the prediction
+
+        :param true_value (np.ndarray) The target value
+        :param prediction (npp.ndarray) Prediction array
+
+        """
         return np.mean((true_value - prediction) ** 2)
 
-    def print_progress(self, target: np.ndarray,
+    def print_progress(self,
+                       target: np.ndarray,
                        output: np.ndarray,
                        iteration: int,
                        total_iterations: int):
@@ -481,9 +521,7 @@ class ANNet:
         if len(x.shape) < 2:
             x = x.reshape((x.shape[0], 1))
 
-        # TODO - ADD classification accuracy
         # TODO - ADD visualization
-
         for iteration in range(num_iterations):
             activations, zs, h = self.forward(x=x)
             if iteration % print_every == 0:
@@ -642,10 +680,6 @@ class ANNet:
         :param print_every: (int)
         :return:
         """
-        # Optimizer
-        if not self.optimizer.dimensions_match(self.network.weight):
-            self.optimizer = AdamOptimizer(self.Theta, learning_rate=self.params.alpha)
-
         historic_prediction = []  # holds the predicted values for every iteration, used for visualization
         historic_theta = []       # holds the wight matrices for every iteration, used for visualization
         cost = np.zeros([num_of_iterations, 1])      # Holding cost value per iteration
@@ -659,15 +693,12 @@ class ANNet:
         num_of_samples = len(x)   # Samples in the training set
 
         # Initialize weights if they have not been initialized by user.
-        if not self.Theta:
-            if self.network.network_architecture is None:
-                print("Network weights has not been initialized by user!, default hidden layer  of size " +
-                      str(self.params.default_hidden_layer_size) + " has been applied")
-                input_layer_size = self.network.input_layer_size
-                output_layer_size = self.network.output_layer_size
-                network_architecture = [input_layer_size, self.params.default_hidden_layer_size, output_layer_size]
-                self.network.network_architecture = network_architecture
-            self.init_network_params(self.network.network_architecture)
+        self.init_weights()
+
+        # Optimizer
+        if not self.optimizer.dimensions_match(self.network.weight):
+            self.optimizer = AdamOptimizer(self.Theta, learning_rate=self.params.alpha)
+
 
         # Preparing label data, every sample will be represented by a vector with the size equal to the number of
         # unique classes in the training data. The correct classification will be marked by a one while the false
