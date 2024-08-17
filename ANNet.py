@@ -29,6 +29,10 @@ class Initialization(Enum):
     EPSILON = 1
     HE = 2
 
+class NetworkType(Enum):
+    CLASSIFICATION = 1
+    REGRESSION = 2
+
 
 class ANNet:
     def __init__(self, network_settings: dict = None):
@@ -54,7 +58,8 @@ class ANNet:
                                        output_layer_size=None,  # Output layer size
                                        input_layer_size=None,  # Input layer size
                                        network_architecture=None,  # Network architecture
-                                       init_method=init_method  # Init method
+                                       init_method=init_method,  # Init method
+                                       network_type=NetworkType.CLASSIFICATION
                                        )
 
         # Normalization
@@ -84,6 +89,9 @@ class ANNet:
         self.optimizer = AdamOptimizer(self.network.weight, learning_rate=self.params.alpha)
 
     def __getattr__(self, item):
+        """ Finds the desired attribute by searching in the class NameSpaces
+
+        """
         network_attribute = ['activation_func', 'bias', 'input_layer_size', 'input_shape', 'network_architecture',
                              'output_func', 'output_layer_size', 'weight']
         param_attribute = ['alpha', 'default_hidden_layer_size', 'epsilon', 'use_optimizer']
@@ -103,7 +111,12 @@ class ANNet:
             raise AttributeError
         return d
 
-    def save(self, save_dir: str = '.'):
+    def save(self, save_dir: str = '.', file_name: str = 'network'):
+        """ Saves the current state of the network to the directory specified in save_dir
+
+        param: save_dir (str) Desired path where saved network should be stored
+        param: file_name (str) Name of file
+        """
         data = {
             'theta': self.Theta,
             'network': self.network,
@@ -112,9 +125,12 @@ class ANNet:
             'normalization': self.normalization,
             'optimizer': self.optimizer
                 }
-        np.save(os.path.join(save_dir, 'network.npy'), data)  # save to npy file
+        np.save(os.path.join(save_dir, f'{file_name}.npy'), data)  # save to npy file
 
     def load_network(self, load_dir: str):
+        """ Loads a previously saved network
+
+        """
         data = np.load(load_dir, allow_pickle=True)
         self.network = data.item().get('network')
         self.params = data.item().get('params')
@@ -123,20 +139,27 @@ class ANNet:
         self.optimizer = data.item().get('optimizer')
         self.Theta = data.item().get('theta')
 
-    def set_alpha(self, alpha):
+    def set_alpha(self, alpha: float):
+        """ Sets the learning rate parameter
+
+        :param alpha: (float) Learning rate
+
+        """
         self.params.alpha = alpha
         self.optimizer.learning_rate = alpha
 
-    def init_network_params(self, network_size):
-        """ Takes a list of integers and assigns it to the network_size class variable and creates the weight matrices
-            (theta) corresponding to the network architecture. The weights of the artificial network will be initialized
-            to random values in the interval (-self.params.epsilon, self.params.epsilon)
+    def init_network_params(self, network_size: list = None):
+        """ Given a network architecture which is a list of integers determining the desired number of neurons per layer
+            the method initializes the network layers with the init method specified in self.network.init_method.
+            If the input variable network_size is provided, the method will assign the internal network_architecture
+            variable to the given list.
 
-        :param network_size: (list)
-        :return theta: (list) List of npArrays containing the network weights
+        :param network_size: (list) List of integers determining how many neurons every layer should have
         """
 
         theta = []
+        if not network_size:
+            network_size = self.network.network_architecture
         self.network.network_architecture = network_size
 
         if self.network.init_method == Initialization.EPSILON:
@@ -169,7 +192,36 @@ class ANNet:
             self.network.weight.append(w)
             self.network.bias.append(b)
 
-        return theta
+    def init_weights(self):
+        """
+
+        """
+        # Initialize weights if they have not been initialized by user.
+        if not self.Theta:
+            if self.network.network_architecture is None:
+                print("Network weights has not been initialized by user!, default hidden layer  of size " +
+                      str(self.params.default_hidden_layer_size) + " has been applied")
+                input_layer_size = self.network.input_layer_size
+                output_layer_size = self.network.output_layer_size
+                network_architecture = [input_layer_size, self.params.default_hidden_layer_size, output_layer_size]
+                self.network.network_architecture = network_architecture
+            self.init_network_params(self.network.network_architecture)
+
+    def set_network_settings(self, settings: dict):
+        if "normalization_method" in settings.keys():
+            self.set_normalization_method(settings["normalization_method"])
+
+        if "activation_function" in settings.keys():
+            self.set_activation_function(settings["activation_function"])
+
+        if "network_architecture" in settings.keys():
+            self.set_network_architecture(settings["network_architecture"])
+
+        if "init_method" in settings.keys():
+            self.set_init_function(settings["init_method"])
+
+        if "output_activation" in settings.keys():
+            self.set_output_activation(settings["output_activation"])
 
     def set_activation_function(self, activation_function: Union[int, str]):
         if isinstance(activation_function, int):
@@ -244,10 +296,12 @@ class ANNet:
         :return:
         """
         self.network.network_architecture = network_architecture
+        self.network.output_layer_size = network_architecture[-1]
+        self.network.input_layer_size = network_architecture[0]
 
     def set_mnist_data(self):
         """ Imports the mnist data-set and assigns it to the train- & test-data. The mnist data-set is an open source
-            data set consisting of 60000 training images of hand-written digits. The method will also assign the
+            data set consisting of 60000 training images of handwritten digits. The method will also assign the
             internal class-variable self.is_mnist to true.
 
         :return:
@@ -379,33 +433,60 @@ class ANNet:
         plt.imshow(im)
         plt.show()
 
-    def init_weights(self):
-        # Initialize weights if they have not been initialized by user.
-        if not self.Theta:
-            if self.network.network_architecture is None:
-                print("Network weights has not been initialized by user!, default hidden layer  of size " +
-                      str(self.params.default_hidden_layer_size) + " has been applied")
-                input_layer_size = self.network.input_layer_size
-                output_layer_size = self.network.output_layer_size
-                network_architecture = [input_layer_size, self.params.default_hidden_layer_size, output_layer_size]
-                self.network.network_architecture = network_architecture
-            self.init_network_params(self.network.network_architecture)
+    @staticmethod
+    def calc_mse(true_value: np.ndarray, prediction: np.ndarray):
+        return np.mean((true_value - prediction) ** 2)
 
-    def set_network_settings(self, settings: dict):
-        if "normalization_method" in settings.keys():
-            self.set_normalization_method(settings["normalization_method"])
+    def print_progress(self, target: np.ndarray,
+                       output: np.ndarray,
+                       iteration: int,
+                       total_iterations: int):
+        """ Evaluates and prints the current progress to the console.
 
-        if "activation_function" in settings.keys():
-            self.set_activation_function(settings["activation_function"])
+        :param target: (np.ndarray) Input data
+        :param output: (np.ndarray) Output
+        :param iteration: (int) Current iteration
+        :param total_iterations: (int) Number of training iterations
+        """
+        mse = self.calc_mse(target, output)
+        prompt = f"Iteration ({iteration} / {total_iterations}), cost: {mse}"
 
-        if "network_architecture" in settings.keys():
-            self.set_network_architecture(settings["network_architecture"])
+        # Calculate number of errors if network is of type classification
+        if self.network.network_type == NetworkType.CLASSIFICATION:
+            num_of_errors = 0
+            for itr, p in enumerate(output):
+                prediction = np.argmax(p)
+                true_val = np.argmax(target[itr])
+                if prediction != true_val:
+                    num_of_errors += 1
 
-        if "init_method" in settings.keys():
-            self.set_init_function(settings["init_method"])
+            prompt += f", number of false predictions: {num_of_errors}, accuracy: {1 - num_of_errors / len(target)}"
+        print(prompt)
 
-        if "output_activation" in settings.keys():
-            self.set_output_activation(settings["output_activation"])
+
+    def train(self, x: np.ndarray, y: np.ndarray, num_iterations: int = 1000, print_every: int = 100):
+        """ Trains the network given som input and desired output
+
+        :param x: (np.ndarray) Input data
+        :param y: (np.ndarray) Output
+        :param num_iterations: (int) Number of training iterations
+        :param print_every: (int) Determines how frequent the training status should be printed
+        """
+        self.optimizer = AdamOptimizer(self.network.weight, learning_rate=self.params.alpha)
+
+        # Reshape data if dimension mismatch
+        if len(x.shape) < 2:
+            x = x.reshape((x.shape[0], 1))
+
+        # TODO - ADD classification accuracy
+        # TODO - ADD visualization
+        # Re-initialize the optimizer TODO - Only reinitialize if mismatch
+
+        for iteration in range(num_iterations):
+            activations, zs, h = self.forward(x=x)
+            if iteration % print_every == 0:
+                self.print_progress(y, h, iteration, num_iterations)
+            self.back(activations, zs, y=y)
 
     def forward(self, x):
         """ Performs the forward propagation through the neural network.
@@ -416,6 +497,10 @@ class ANNet:
             zs: (list) List of z values (weighted input to activation functions) for each layer.
             output: (numpy array) Final output of the network.
         """
+        # Reshape data if dimension mismatch
+        if len(x.shape) < 2:
+            x = x.reshape((x.shape[0], 1))
+
         activations = [x]  # Store the input layer activations
         zs = []            # Store the z values for each layer
 
@@ -538,7 +623,7 @@ class ANNet:
 
         return h, c, a_list, z_list
 
-    def train_network(self, x=None, y=None, num_of_iterations=1000, visualize_training=False):
+    def train_network(self, x=None, y=None, num_of_iterations=1000, visualize_training=False, print_every: int = 100):
         """ The method will initialize a training session with a number of training iterations determined by the
             variable num_of_iterations (int). The network will be trained using the x data as input data and the
             y data as the annotations. If x or y are not provided the input data and the annotation data will be
@@ -552,8 +637,12 @@ class ANNet:
                                               back-propagation
         :param num_of_iterations:  (int)      Number of iterations to be executed in the training session
         :param visualize_training: (boolean)  Boolean flag to indicate if the training session should be visualized
+        :param print_every: (int)
         :return:
         """
+        # Optimizer
+        self.optimizer = AdamOptimizer(self.Theta, learning_rate=self.params.alpha)
+
         historic_prediction = []  # holds the predicted values for every iteration, used for visualization
         historic_theta = []       # holds the wight matrices for every iteration, used for visualization
         cost = np.zeros([num_of_iterations, 1])      # Holding cost value per iteration
@@ -581,14 +670,17 @@ class ANNet:
         # unique classes in the training data. The correct classification will be marked by a one while the false
         # classifications are marked with a zero for all samples. The label matrix will be of the size
         # [num_of_train_samples x num_of_unique_classes]
-        if len(y.shape) < 2:
+        if self.network.network_type == NetworkType.REGRESSION:
             y_mat = y
-        elif y.shape[0] == 1 or y.shape[1] == 1:
-            y_mat = np.zeros((y.shape[0], self.network.output_layer_size))
-            for i, val in enumerate(y):
-                y_mat[i][int(val)] = 1
         else:
-            y_mat = y
+            if len(y.shape) < 2:
+                y_mat = y
+            elif y.shape[0] == 1 or y.shape[1] == 1:
+                y_mat = np.zeros((y.shape[0], self.network.output_layer_size))
+                for i, val in enumerate(y):
+                    y_mat[i][int(val)] = 1
+            else:
+                y_mat = y
 
         for iteration in range(0, num_of_iterations):
             # Init weight gradient matrices
@@ -633,30 +725,29 @@ class ANNet:
                     t = self.params.alpha * theta_grad[i]
                     self.Theta[i] -= t.flatten()
 
-            # Calculate and print cost
-            h, c, _, _ = ANNet.forward_propagation(self, x, y_mat)
+            if self.network.network_type != NetworkType.REGRESSION:
+                # Calculate and print cost
+                h, c, _, _ = ANNet.forward_propagation(self, x, y_mat)
 
-            itr = 0
-            num_of_errors = 0
-            for p in h:
-                prediction = np.argmax(p)
-                y = np.argmax(y_mat[itr])
-                if not prediction == y:
-                    num_of_errors += 1
-                itr += 1
-            # ------------------------------ print iteration --------------------------------
-            if visualize_training:
-                cost[iteration] = c
-                accuracy[iteration] = 1 - num_of_errors/num_of_samples
+                num_of_errors = 0
+                for itr, p in enumerate(h):
+                    prediction = np.argmax(p)
+                    y = np.argmax(y_mat[itr])
+                    if not prediction == y:
+                        num_of_errors += 1
+                # ------------------------------ print iteration --------------------------------
+                if visualize_training:
+                    cost[iteration] = c
+                    accuracy[iteration] = 1 - num_of_errors/num_of_samples
 
-                # Save the weight values for animation
-                historic_theta.append(copy.deepcopy(self.Theta))
-                historic_prediction.append(h)
-
-            print("Iteration (" + str(iteration) + "/" + str(num_of_iterations) + "), " +
-                  "Cost of network: " + str(c) +
-                  " , number of false predictions: " + str(num_of_errors) +
-                  " , accuracy: " + str(1 - num_of_errors/num_of_samples))
+                    # Save the weight values for animation
+                    historic_theta.append(copy.deepcopy(self.Theta))
+                    historic_prediction.append(h)
+                if iteration % print_every == 0:
+                    print("Iteration (" + str(iteration) + "/" + str(num_of_iterations) + "), " +
+                          "Cost of network: " + str(c) +
+                          " , number of false predictions: " + str(num_of_errors) +
+                          " , accuracy: " + str(1 - num_of_errors/num_of_samples))
 
         if visualize_training:
 
