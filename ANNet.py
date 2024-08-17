@@ -191,6 +191,7 @@ class ANNet:
 
             self.network.weight.append(w)
             self.network.bias.append(b)
+        self.optimizer = AdamOptimizer(self.network.weight, learning_rate=self.params.alpha)
 
     def init_weights(self):
         """
@@ -206,6 +207,7 @@ class ANNet:
                 network_architecture = [input_layer_size, self.params.default_hidden_layer_size, output_layer_size]
                 self.network.network_architecture = network_architecture
             self.init_network_params(self.network.network_architecture)
+        self.optimizer = AdamOptimizer(self.network.weight, learning_rate=self.params.alpha)
 
     def set_network_settings(self, settings: dict):
         if "normalization_method" in settings.keys():
@@ -472,7 +474,8 @@ class ANNet:
         :param num_iterations: (int) Number of training iterations
         :param print_every: (int) Determines how frequent the training status should be printed
         """
-        self.optimizer = AdamOptimizer(self.network.weight, learning_rate=self.params.alpha)
+        if not self.optimizer.dimensions_match(self.network.weight):
+            self.optimizer = AdamOptimizer(self.network.weight, learning_rate=self.params.alpha)
 
         # Reshape data if dimension mismatch
         if len(x.shape) < 2:
@@ -480,7 +483,6 @@ class ANNet:
 
         # TODO - ADD classification accuracy
         # TODO - ADD visualization
-        # Re-initialize the optimizer TODO - Only reinitialize if mismatch
 
         for iteration in range(num_iterations):
             activations, zs, h = self.forward(x=x)
@@ -641,7 +643,8 @@ class ANNet:
         :return:
         """
         # Optimizer
-        self.optimizer = AdamOptimizer(self.Theta, learning_rate=self.params.alpha)
+        if not self.optimizer.dimensions_match(self.network.weight):
+            self.optimizer = AdamOptimizer(self.Theta, learning_rate=self.params.alpha)
 
         historic_prediction = []  # holds the predicted values for every iteration, used for visualization
         historic_theta = []       # holds the wight matrices for every iteration, used for visualization

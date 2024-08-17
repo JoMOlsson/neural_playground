@@ -1,3 +1,5 @@
+from ast import Index
+
 import numpy as np
 
 
@@ -21,6 +23,18 @@ class AdamOptimizer:
         if len(self.m) != len(self.parameters):
             self.m = [np.zeros_like(param) for param in parameters]
             self.v = [np.zeros_like(param) for param in parameters]
+
+    def dimensions_match(self, params: list[np.ndarray]):
+        dimension_match = True
+
+        for i, p in enumerate(params):
+            try:
+                if p.shape != self.parameters[i].shape:
+                    dimension_match = False
+                    break
+            except IndexError:
+                dimension_match = False
+        return dimension_match
 
     def step(self, gradients, flatten: bool = False):
         self.t += 1
