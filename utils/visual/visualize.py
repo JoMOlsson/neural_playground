@@ -19,7 +19,7 @@ def animate_training(x: Union[list, np.ndarray],
                      is_mnist: bool = False,
                      input_shape: list = None,
                      original_images: list = None,
-                     absolute_weight: bool = False,
+                     absolute_weight: bool = True,
                      ask_user: bool = True
                      ) -> None:
     """ The method will visualize the training session in a (2x2) subplot displaying cost/accuracy, sample
@@ -48,21 +48,6 @@ def animate_training(x: Union[list, np.ndarray],
     mng.full_screen_toggle()
     temp_folder = create_temp_folder()  # Create a temp-folder to store the training visualisation content
 
-    # Extract min/max weight
-    max_weight = []
-    min_weight = []
-    if absolute_weight:
-        max_weight = -np.inf
-        min_weight = np.inf
-        for theta in historic_theta:
-            for t in theta:
-                max_v = np.max(np.max(t))
-                min_v = np.min(np.min(t))
-                if max_weight < max_v:
-                    max_weight = max_v
-                if min_weight > min_v:
-                    min_weight = min_v
-
     picture_idx = []
     num_of_pics_m = 20  # Number of images vertically
     num_of_pics_n = 40  # Number of images horizontally
@@ -75,10 +60,12 @@ def animate_training(x: Union[list, np.ndarray],
 
     n_start = 0
     n_end = len(historic_prediction)
+    n_step = 1
     if ask_user:
         try:
             n_start = int(input("Select starting index for rendering"))
             n_end = int(input("Select ending index for rendering"))
+            n_step = int(input("Select step size"))
         except ValueError:
             print("Provided input is not valid, only integers.")
 
@@ -86,7 +73,22 @@ def animate_training(x: Union[list, np.ndarray],
     if n_start > n_end:
         n_start, n_end = n_end, n_start
 
-    for iteration in range(n_start, n_end):
+    # Extract min/max weight
+    max_weight = []
+    min_weight = []
+    if absolute_weight:
+        max_weight = -np.inf
+        min_weight = np.inf
+        for theta in historic_theta[n_start:n_end]:
+            for t in theta:
+                max_v = np.max(np.max(t))
+                min_v = np.min(np.min(t))
+                if max_weight < max_v:
+                    max_weight = max_v
+                if min_weight > min_v:
+                    min_weight = min_v
+
+    for iteration in range(n_start, n_end, n_step):
         title_str = 'Cost: ' + str(cost[iteration]) + ' , Accuracy: ' + str(accuracy[iteration]) + \
                     ' , Iteration: ' + str(iteration)
         fig.suptitle(title_str)
@@ -119,10 +121,15 @@ def animate_training(x: Union[list, np.ndarray],
             axs[0, 0].set_ylabel('Number of false vs number of true')
         else:
             for i_sample in range(0, h.shape[0]):
-                col.append('#ff5959' if np.argmax(h[i_sample, :]) else '#34ebd6')
+                if len(h[i_sample]) > 1:
+                    col.append('#ff5959' if np.argmax(h[i_sample, :]) else '#34ebd6')
+                else:
+                    col.append('#ff5959' if np.round(h[i_sample, :]) else '#34ebd6')
                 col_true.append('#ff5959' if train_labels[i_sample] else '#34ebd6')
-
-            axs[0, 0].scatter(x[:, 0], x[:, 1], c=col)
+            if len(x.shape) > 1 and x.shape[1] > 1:
+                axs[0, 0].scatter(x[:, 0], x[:, 1], c=col)
+            else:
+                axs[0, 0].scatter(np.zeros_like(x), x[:, 0], c=col)
             axs[0, 0].axis('equal')
             axs[0, 0].set_xticks([])
             axs[0, 0].set_yticks([])
@@ -179,7 +186,10 @@ def animate_training(x: Union[list, np.ndarray],
             axs[0, 1].set_yticks([])
             axs[0, 1].set_title(str(round(tot_num_of_pics / len(train_labels) * 1000) / 10) + '% of the data')
         else:
-            axs[0, 1].scatter(x[:, 0], x[:, 1], c=col_true)
+            if len(x.shape) > 1 and x.shape[1] > 1:
+                axs[0, 1].scatter(x[:, 0], x[:, 1], c=col_true)
+            else:
+                axs[0, 1].scatter(np.zeros_like(x), x[:, 0], c=col_true)
             axs[0, 1].axis('equal')
             axs[0, 1].set_xticks([])
             axs[0, 1].set_yticks([])
@@ -267,7 +277,7 @@ def determine_number_of_digits(num_of_iterations):
 
 def append_with_zeros(num_of_digits, iteration):
     """ Will give the file-name of the current iteration. The file will be named to enable natrual sorting even in
-        a windows OS. For instance, if total number of digits == 3 and current iteration is 7 the file-name will be
+        a Windows OS. For instance, if total number of digits == 3 and current iteration is 7 the file-name will be
         "007"
 
     :param num_of_digits:  (int) Total number of needed digits in the file-naming
@@ -283,10 +293,11 @@ def append_with_zeros(num_of_digits, iteration):
     return appended_name
 
 
-def draw_network(theta, axs, network_size, max_weight=None, min_weight=None):
-    """ The method will take list of weight matrices (npArray) and a plot axis and display the the network
+def draw_network(theta, axs, network_size, max_weight=None, min_weight=None, use_old_theta: bool = False,
+                 plot_weight_text: bool = True, write_sum_text: bool = False):
+    """ The method will take list of weight matrices (npArray) and a plot axis and display the network
         given by the weight matrices. If the max&min weight values (float) are given, they will be used as
-        max and min for the color scaling of the weight lines, otherwise the the method will use the max
+        max and min for the color scaling of the weight lines, otherwise the method will use the max
         and min value in the weight matrices. This is used to enable absolute color scaling through
         a series of training iterations. The method will display all neurons, along with bias neurons as-well
         as the weight network between the neurons. The color of the neurons and the weights will be set by
@@ -298,6 +309,9 @@ def draw_network(theta, axs, network_size, max_weight=None, min_weight=None):
     :param network_size (list)
     :param max_weight: (float)           maximum value used for color scaling
     :param min_weight: (float)           minimum value used for color scaling
+    :param use_old_theta: (bool)         If True, deprecated weight arrays will be used
+    :param plot_weight_text: (bool)
+    :param write_sum_text: (bool)
 
     :return:
     """
@@ -309,13 +323,13 @@ def draw_network(theta, axs, network_size, max_weight=None, min_weight=None):
     network_architecture = []
     i_layer = len(theta)
     for i_layer, t in enumerate(theta):
-        theta[i_layer] = t.reshape(network_size[i_layer] + 1,
-                                   network_size[i_layer + 1])
+        if use_old_theta:
+            theta[i_layer] = t.reshape(network_size[i_layer] + 1, network_size[i_layer + 1])
         network_architecture.append(theta[i_layer].shape[0])
     network_architecture.append(theta[i_layer].shape[1])
 
     # Calculate position lists
-    use_max_y = True
+    use_max_y = False
     max_y = (max(network_architecture) - 1) * (neuron_distance + 2 * neuron_radius)
 
     x = 0  # x-position of the first neural layer
@@ -328,10 +342,13 @@ def draw_network(theta, axs, network_size, max_weight=None, min_weight=None):
         if use_max_y:
             # The width in the y-dimension will be equal for all layers
             y0 = max_y / 2
-            delta_y = max_y / (N_neurons - 1)
+            if N_neurons > 1:
+                delta_y = max_y / (N_neurons - 1)
+            else:
+                delta_y = max_y / 2
         else:
             # The width in the y-dimension will be different for all layers. The y-positions of the neurons will
-            # distributed according to the neuron_radius and neuron_distance variables
+            # distribute according to the neuron_radius and neuron_distance variables
 
             if N_neurons % 2:
                 n = math.floor(N_neurons / 2)
@@ -358,54 +375,6 @@ def draw_network(theta, axs, network_size, max_weight=None, min_weight=None):
     n_col_steps = 1000
     colors = list(blue.range_to(Color("red"), n_col_steps))  # Colormap to be used for scaling the colors of
     #                                                          the neurons and the weights
-
-    # ===== Plot neurons =====
-    for iLayer, n_pos in enumerate(neuron_positions):
-        if iLayer == len(neuron_positions) - 1:
-            output_layer = True
-            input_layer = False
-            t = theta[iLayer - 1]
-        elif not iLayer:
-            output_layer = False
-            input_layer = True
-            t = []
-        else:
-            output_layer = False
-            input_layer = False
-            t = theta[iLayer - 1]
-
-        if output_layer:
-            neuron_value = []
-            for i in range(0, t.shape[0]):
-                neuron_value.append(np.sum(t[i, :]))
-            min_neuron_val = np.min(neuron_value)
-            max_neuron_val = np.max(neuron_value)
-        elif not input_layer:
-            neuron_value = []
-            for i in range(0, t.shape[1]):
-                neuron_value.append(np.sum(t[:, i]))
-            min_neuron_val = np.min(neuron_value)
-            max_neuron_val = np.max(neuron_value)
-        else:
-            neuron_value = []
-            min_neuron_val = None
-            max_neuron_val = None
-
-        for iNeuron, p in enumerate(n_pos):
-            # Get synapse color
-            if input_layer:
-                # Input layer
-                c = str(colors[0])
-            else:
-                if iNeuron:
-                    col_idx = math.floor(((neuron_value[iNeuron - 1] - min_neuron_val) /
-                                          (max_neuron_val - min_neuron_val)) * (n_col_steps - 1))
-                    c = str(colors[col_idx])
-                else:
-                    c = str(colors[0])
-
-            draw_circle = plt.Circle((p[0], p[1]), radius=neuron_radius, color=c)
-            axs.add_patch(draw_circle)
 
     # ===== Plot Connections =====
 
@@ -448,16 +417,72 @@ def draw_network(theta, axs, network_size, max_weight=None, min_weight=None):
                                           (max_weight - min_weight)) * (n_col_steps - 1))
                     c = str(colors[col_idx])
                     plt.plot([p1[0], p2[0]], [p1[1], p2[1]], color=c, alpha=a)
+                    if plot_weight_text:
+                        t_x_pos = p1[0] + (p2[0] - p1[0]) / 4
+                        t_y_pos = p1[1] + (p2[1] - p1[1]) / 4
+                        plt.text(t_x_pos, t_y_pos, f"{round(connection_weight * 1000) / 1000}")
+
+    # ===== Plot neurons =====
+    for iLayer, n_pos in enumerate(neuron_positions):
+        if iLayer == len(neuron_positions) - 1:
+            output_layer = True
+            input_layer = False
+            t = theta[iLayer - 1]
+        elif not iLayer:
+            output_layer = False
+            input_layer = True
+            t = []
+        else:
+            output_layer = False
+            input_layer = False
+            t = theta[iLayer - 1]
+
+        if output_layer:
+            neuron_value = []
+            for i in range(0, t.shape[0]):
+                neuron_value.append(np.sum(t[i, :]))
+            min_neuron_val = np.min(neuron_value)
+            max_neuron_val = np.max(neuron_value)
+        elif not input_layer:
+            neuron_value = []
+            for i in range(0, t.shape[1]):
+                neuron_value.append(np.sum(t[:, i]))
+            min_neuron_val = np.min(neuron_value)
+            max_neuron_val = np.max(neuron_value)
+        else:
+            neuron_value = []
+            min_neuron_val = None
+            max_neuron_val = None
+
+        for iNeuron, p in enumerate(n_pos):
+            # Get synapse color
+            if input_layer:
+                # Input layer
+                c = str(colors[0])
+            else:
+                if iNeuron:
+                    try:
+                        col_idx = math.floor(((neuron_value[iNeuron - 1] - min_neuron_val) /
+                                              (max_neuron_val - min_neuron_val)) * (n_col_steps - 1))
+                        c = str(colors[col_idx])
+                    except:
+                        c = str(colors[0])
+                else:
+                    c = str(colors[0])
+
+            draw_circle = plt.Circle((p[0], p[1]), radius=neuron_radius, color=c)
+            axs.add_patch(draw_circle)
 
     # ===== write theta sum text =====
-    y_pos = min(min_y_pos) + 2 * neuron_distance
-    x_pos = layer_distance / 4
-    for t in theta:
-        theta_sum = np.sum(np.sum(t))
-        theta_sum = np.floor(theta_sum * 1000) / 1000
-        s = 'weight sum: ' + str(theta_sum)
-        plt.text(x_pos, y_pos, s)
-        x_pos += layer_distance
+    if write_sum_text:
+        y_pos = min(min_y_pos) + 2 * neuron_distance
+        x_pos = layer_distance / 4
+        for t in theta:
+            theta_sum = np.sum(np.sum(t))
+            theta_sum = np.floor(theta_sum * 1000) / 1000
+            s = 'weight sum: ' + str(theta_sum)
+            plt.text(x_pos, y_pos, s)
+            x_pos += layer_distance
 
     axs.set_xticks([])  # Delete x-ticks
     axs.set_yticks([])  # Delete y-ticks
