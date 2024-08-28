@@ -5,12 +5,14 @@ import numpy as np
 import json
 import random
 from six.moves import urllib
+
 opener = urllib.request.build_opener()
 opener.addheaders = [('User-agent', 'Mozilla/5.0')]
 urllib.request.install_opener(opener)
 
 
-def create_circle(inner_radius, outer_radius, create_internal_circles=False, visualize=False):
+def create_circle(inner_radius, outer_radius, create_internal_circles=False, visualize=False,
+                  n_inner=10000, n_outer=15000):
     """ The method creates a 2-class data-set for training of a neural network. The data will be in the form of
         two circles (inner, outer). If the create_internal_circles option is true, teh method will create smaller
         internal circles of the opposite class in both the inner and the outer circle.
@@ -19,15 +21,17 @@ def create_circle(inner_radius, outer_radius, create_internal_circles=False, vis
     :param outer_radius: (float) Radius of outer circle
     :param create_internal_circles: (boolean) Boolean variable to control if the generated circles should include
                                               internal sub-circles of the opposite class
-    :param visualize (boolean)
+    :param visualize: (boolean)
+    :param n_inner:
+    :param n_outer:
     :return data, labels: (npArray, npArray) data array with x- & y-coordinates
                                              labels with two classes (0, 1)
     """
     dist_between_circles = 0.8  # Distance between inner and outer circles
     sub_circle_1_radius = 0.5   # Radius of sub-circles in inner circle (used if create_internal_circles)
     sub_circle_2_radius = 1.2   # Radius of sub-circles in outer circle (used if create_internal_circles)
-    num_1 = 10000               # Number of samples in inner circle
-    num_2 = 15000               # Number of samples in outer circle
+    num_1 = n_inner               # Number of samples in inner circle
+    num_2 = n_outer               # Number of samples in outer circle
     data = np.zeros([num_1 + num_2, 2])
     labels = np.zeros([num_1 + num_2, 1])
 
@@ -120,6 +124,33 @@ def get_xor_data():
     labels = np.array([0, 1, 1, 0])
     return data, labels
 
+
+def get_square_data():
+    train_data = np.random.uniform(-10, 10, 2000)
+
+    train_data = np.append(train_data, np.random.uniform(-20, -15, 2000))
+    train_data = np.append(train_data, np.random.uniform(15, 20, 2000))
+    train_data = train_data.reshape((train_data.shape[0], 1))
+    train_output = train_data ** 2
+
+    test_data = np.linspace(-15, 15, 1000)
+    test_data = np.append(test_data, np.random.uniform(30, 40, 1000))
+    test_data = test_data.reshape((test_data.shape[0], 1))
+    test_output = test_data ** 2
+    return  train_data, train_output, test_data, test_output
+
+def get_cube_data():
+    train_data = np.random.uniform(-12, 12, 2000)
+
+    train_data = np.append(train_data, np.random.uniform(-20, -15, 2000))
+    train_data = np.append(train_data, np.random.uniform(15, 20, 2000))
+    train_data = train_data.reshape((train_data.shape[0], 1))
+    train_output = train_data ** 3
+
+    test_data = np.linspace(-15, 15, 1000)
+    test_data = test_data.reshape((test_data.shape[0], 1))
+    test_output = test_data ** 3
+    return  train_data, train_output, test_data, test_output
 
 def load_and_parse_dql_data(data_dir: str, ratio: float = 1.0):
     """ Loads and parses episodes from flappy bird games used for training a Deep Q-learning agent.
