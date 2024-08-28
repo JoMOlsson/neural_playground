@@ -8,6 +8,7 @@ import random
 from enum import Enum
 from typing import Union
 from types import SimpleNamespace
+import time
 
 try:
     from utils.activation import activate, gradient, ActivationFunction
@@ -20,9 +21,9 @@ except ModuleNotFoundError:
     from .utils.opimizer.adam import AdamOptimizer
     from .utils.visual.visualize import animate_training, create_gif_from_dump
 
-# TODO - CLEAN UP CODE
-# TODO - CHECK HOW TO SET SETTINGS CONVENIENTLY
+# TODO - CHECK HOW TO SET SETTINGS CONVENIENTLY, MAYBE A SETTINGS CLASS
 # TODO - RE WRITE TRAINING AND REMOVE DEPRECATED
+# TODO - CHECK ACCURACY CALCULATION
 
 
 class Initialization(Enum):
@@ -46,7 +47,8 @@ class ANNet:
         self.params = SimpleNamespace(alpha=10,  # Learning rate
                                       default_hidden_layer_size=15,  # Default number of neurons in hidden layer
                                       epsilon=0.12,  # Initialization value for weight matrices
-                                      use_optimizer=False)
+                                      use_optimizer=False,
+                                      has_cupy=self.has_cupy())
 
         # Network
         self.Theta = []  # Holding weight matrices
@@ -59,11 +61,12 @@ class ANNet:
                                        input_layer_size=None,  # Input layer size
                                        network_architecture=None,  # Network architecture
                                        init_method=init_method,  # Init method
-                                       network_type=NetworkType.CLASSIFICATION
+                                       network_type=NetworkType.CLASSIFICATION,
+                                       total_number_of_training_iterations=0
                                        )
 
         # Normalization
-        self.normalization = SimpleNamespace(feature_mean_vector=[],  # (list) average values in data per feature
+        self.normalization = SimpleNamespace(feature_mean_vector=[], # (list) average values in data per feature
                                              feature_var_vector=[],  # (list) variance values in data per feature
                                              feature_min_vector=[],  # (list) min values in data per feature
                                              feature_max_vector=[],  # (list) max values in data per feature
@@ -85,8 +88,24 @@ class ANNet:
         if network_settings is not None:
             self.set_network_settings(network_settings)
 
+        self.progress = self.init_progress()
+
+        self.xp = self.configure_backend(use_cupy=False)  # Backend
+
         # Optimizer
         self.optimizer = AdamOptimizer(self.network.weight, learning_rate=self.params.alpha)
+        self.bias_optimizer = AdamOptimizer(self.network.bias, learning_rate=self.params.alpha)
+
+    def init_progress(self):
+        self.progress = SimpleNamespace(iteration = [],
+                                        cost = [],
+                                        predictions = [],
+                                        weights = [],
+                                        bias=[],
+                                        number_of_errors = [],
+                                        accuracy = [])
+        return self.progress
+
 
     def __getattr__(self, item):
         """ Finds the desired attribute by searching in the class NameSpaces
@@ -96,7 +115,7 @@ class ANNet:
         """
         network_attribute = ['activation_func', 'bias', 'input_layer_size', 'input_shape', 'network_architecture',
                              'output_func', 'output_layer_size', 'weight']
-        param_attribute = ['alpha', 'default_hidden_layer_size', 'epsilon', 'use_optimizer']
+        param_attribute = ['alpha', 'default_hidden_layer_size', 'epsilon', 'use_optimizer', 'has_cupy']
         norm_attribute = ['feature_mean_vector', 'feature_var_vector', 'feature_min_vector',
                           'feature_max_vector', 'data_min', 'data_max', 'norm_method']
         data_attribute = ['num_of_train_samples', 'num_of_test_samples', 'train_data',
@@ -125,7 +144,8 @@ class ANNet:
             'params': self.params,
             'data': self.data,
             'normalization': self.normalization,
-            'optimizer': self.optimizer
+            'optimizer': self.optimizer,
+            'bias_optimizer': self.bias_optimizer
                 }
         np.save(os.path.join(save_dir, f'{file_name}.npy'), data)  # save to npy file
 
@@ -141,7 +161,27 @@ class ANNet:
         self.data = data.item().get('data')
         self.normalization = data.item().get('normalization')
         self.optimizer = data.item().get('optimizer')
+        self.bias_optimizer = data.item().get('bias_optimizer')
         self.Theta = data.item().get('theta')
+        self.params.has_cupy = self.has_cupy()
+        self.xp = self.configure_backend(use_cupy=False)
+
+    def configure_backend(self, use_cupy=False):
+        """Set up the backend to use either NumPy or CuPy."""
+        if use_cupy and self.params.has_cupy:
+            import cupy as cp
+            return cp
+        else:
+            return np
+
+    @staticmethod
+    def has_cupy():
+        try:
+            import cupy as cp
+            has_cupy = True
+        except ImportError:
+            has_cupy = False
+        return has_cupy
 
     def set_alpha(self, alpha: float):
         """ Sets the learning rate parameter
@@ -151,6 +191,7 @@ class ANNet:
         """
         self.params.alpha = alpha
         self.optimizer.learning_rate = alpha
+        self.bias_optimizer.learning_rate = alpha
 
     def init_network_params(self, network_size: list = None):
         """ Given a network architecture which is a list of integers determining the desired number of neurons per layer
@@ -196,6 +237,7 @@ class ANNet:
             self.network.weight.append(w)
             self.network.bias.append(b)
         self.optimizer = AdamOptimizer(self.network.weight, learning_rate=self.params.alpha)
+        self.bias_optimizer = AdamOptimizer(self.network.bias, learning_rate=self.params.alpha)
 
     def init_weights(self):
         """ Deprecated method for setting the weights
@@ -212,6 +254,7 @@ class ANNet:
                 self.network.network_architecture = network_architecture
             self.init_network_params(self.network.network_architecture)
         self.optimizer = AdamOptimizer(self.network.weight, learning_rate=self.params.alpha)
+        self.bias_optimizer = AdamOptimizer(self.network.bias, learning_rate=self.params.alpha)
 
     def set_network_settings(self, settings: dict):
         """ Given a settings dictionary the method will assign the containing values to
@@ -472,8 +515,8 @@ class ANNet:
     def calc_mse(true_value: np.ndarray, prediction: np.ndarray):
         """ Calculates the mean square error between the true value and the prediction
 
-        :param true_value (np.ndarray) The target value
-        :param prediction (npp.ndarray) Prediction array
+        :param true_value: (np.ndarray) The target value
+        :param prediction: (npp.ndarray) Prediction array
 
         """
         return np.mean((true_value - prediction) ** 2)
@@ -497,36 +540,116 @@ class ANNet:
         if self.network.network_type == NetworkType.CLASSIFICATION:
             num_of_errors = 0
             for itr, p in enumerate(output):
-                prediction = np.argmax(p)
-                true_val = np.argmax(target[itr])
-                if prediction != true_val:
+                prediction = np.argmax(p) if len(p) > 1 else np.round(p)
+                if prediction != target[itr]:
                     num_of_errors += 1
 
             prompt += f", number of false predictions: {num_of_errors}, accuracy: {1 - num_of_errors / len(target)}"
         print(prompt)
 
+    def track_progress(self, target: np.ndarray, output: np.ndarray, iteration: int,):
+        self.progress.iteration.append(iteration)
+        self.progress.cost.append(self.calc_mse(target, output))
+        self.progress.weights.append(copy.deepcopy(self.network.weight))
+        self.progress.bias.append(copy.deepcopy(self.network.bias))
+        self.progress.predictions.append(copy.deepcopy(output))
 
-    def train(self, x: np.ndarray, y: np.ndarray, num_iterations: int = 1000, print_every: int = 100):
+        # Calculate number of errors if network is of type classification
+        if self.network.network_type == NetworkType.CLASSIFICATION:
+            num_of_errors = 0
+            for itr, p in enumerate(output):
+                prediction = np.argmax(p) if len(p) > 1 else np.round(p)
+                if prediction != target[itr]:
+                    num_of_errors += 1
+
+            self.progress.number_of_errors.append(num_of_errors)
+            self.progress.accuracy.append((len(output) - num_of_errors) / len(output))
+        else:
+            self.progress.number_of_errors.append(np.nan)
+            self.progress.accuracy.append(np.nan)
+
+
+    def train(self, x: np.ndarray, y: np.ndarray, num_iterations: int = 1000, print_every: int = 100,
+              visualize: bool = False, use_cupy: bool = False, profile: bool = False):
         """ Trains the network given som input and desired output
 
         :param x: (np.ndarray) Input data
         :param y: (np.ndarray) Output
         :param num_iterations: (int) Number of training iterations
         :param print_every: (int) Determines how frequent the training status should be printed
+        :param visualize: (bool) Visualizes the training if set to true
+        :param use_cupy: (bool) Flag to select if cupy should be used or not
+        :param profile: (bool) IF true, the training process with individual steps will be profiled
         """
-        if not self.optimizer.dimensions_match(self.network.weight):
+        if not hasattr(self.network, 'total_number_of_training_iterations'):
+            self.network.total_number_of_training_iterations = 0
+
+        # Configure compute backend
+        self.xp = self.configure_backend(use_cupy=use_cupy)
+
+        if visualize:
+            self.init_progress()  # Reset progress data struct
+
+        # Re-initialize optimizer if weight dimensions mismatch
+        if (not self.optimizer.dimensions_match(self.network.weight) or
+                not self.bias_optimizer.dimensions_match(self.network.bias)):
             self.optimizer = AdamOptimizer(self.network.weight, learning_rate=self.params.alpha)
+            self.bias_optimizer = AdamOptimizer(self.network.bias, learning_rate=self.params.alpha)
 
         # Reshape data if dimension mismatch
         if len(x.shape) < 2:
             x = x.reshape((x.shape[0], 1))
 
-        # TODO - ADD visualization
+        forward_profile, backward_profile, print_profile, progress_profile = [], [], [], []
+        ts = time.time()
         for iteration in range(num_iterations):
+            self.network.total_number_of_training_iterations += 1
+
+            # Forward propagation
+            t0 = time.time()
             activations, zs, h = self.forward(x=x)
+
+            # Print to console
+            t1 = time.time()
             if iteration % print_every == 0:
                 self.print_progress(y, h, iteration, num_iterations)
+
+            # Track progress for visualization
+            t2 = time.time()
+            if visualize:
+                self.track_progress(y, h, iteration)
+
+            # Back-propagation
+            t3 = time.time()
             self.back(activations, zs, y=y)
+            t4 = time.time()
+
+            if profile:
+                forward_profile.append(t1-t0)
+                print_profile.append(t2 - t1)
+                progress_profile.append(t3 - t2)
+                backward_profile.append(t4 - t3)
+        te = time.time()
+
+        if profile:
+            print("-----------------------------------------------------------------------")
+            print(f"Total elapsed time: {te - ts}")
+            print(f"Average time per iteration: {(te - ts) / num_iterations}")
+            print(f"Total number of iterations: {num_iterations}")
+            print(f"    Average time per forward propagation: {np.mean(forward_profile)}")
+            print(f"    Average time per back propagation: {np.mean(backward_profile)}")
+            print(f"    Average time per print profile: {np.mean(print_profile)}")
+            print(f"    Average time per progress profile: {np.mean(progress_profile)}")
+            print("-----------------------------------------------------------------------")
+
+        if visualize:
+            concat_weights = []
+            for itr, w in enumerate(self.progress.weights):
+                b = self.progress.bias[itr]
+                concat_weights.append([np.vstack([b[i], w[i]]) for i in range(len(b))])
+            animate_training(x, self.progress.cost, self.progress.accuracy, concat_weights,
+                             self.progress.predictions, network_architecture=self.network.network_architecture,
+                             train_labels=y, is_mnist=self.visual.is_mnist)
 
     def forward(self, x):
         """ Performs the forward propagation through the neural network.
@@ -546,7 +669,7 @@ class ANNet:
 
         for i in range(len(self.network.weight)):
             # Compute the z value (weighted sum of inputs + bias)
-            z = np.dot(activations[-1], self.network.weight[i]) + self.network.bias[i]
+            z = self.xp.dot(activations[-1], self.network.weight[i]) + self.network.bias[i]
             zs.append(z)  # Store the z value
             # Apply the activation function (sigmoid)
             a = activate(self.network.activation_func, z) if i != len(self.network.weight) - 1 else (
@@ -580,7 +703,7 @@ class ANNet:
         for layer in reversed(range(len(self.network.weight) - 1)):
             z = z_list[layer]
             zp = gradient(self.network.activation_func, z)
-            delta = np.dot(deltas[-1], self.network.weight[layer + 1].T) * zp
+            delta = self.xp.dot(deltas[-1], self.network.weight[layer + 1].T) * zp
             deltas.append(delta)
             d_bias.append(delta.mean(axis=0))
             d_weight.append(np.dot(activations[layer].T, delta))
@@ -590,14 +713,17 @@ class ANNet:
         d_bias.reverse()
 
         # Update the weights and biases using the calculated gradients
-        for i in range(len(self.network.weight)):
-            if not self.params.use_optimizer:
+        if not self.params.use_optimizer:
+            for i in range(len(self.network.weight)):
                 self.network.weight[i] -= self.params.alpha * d_weight[i]
-            self.network.bias[i] -= self.params.alpha * d_bias[i]
+                self.network.bias[i] -= self.params.alpha * d_bias[i]
 
         if self.params.use_optimizer:
             self.optimizer.set_parameters(self.network.weight)
             self.network.weight = self.optimizer.step(d_weight)
+
+            self.bias_optimizer.set_parameters(self.network.bias)
+            self.network.bias = self.bias_optimizer.step(d_bias)
 
     def forward_propagation(self, x, y=None):
         """ Will make predictions by forward propagate the provided input data x through the neural network stored in
