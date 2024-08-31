@@ -152,24 +152,21 @@ def get_cube_data():
     test_output = test_data ** 3
     return  train_data, train_output, test_data, test_output
 
-def load_and_parse_dql_data(data_dir: str, ratio: float = 1.0):
+def load_and_parse_dql_data(data_dir: str, ratio: float = 1.0, mode: int = 0, max_samples = None):
     """ Loads and parses episodes from flappy bird games used for training a Deep Q-learning agent.
 
         state:
-            y
-            vy
-            ay
-            uy
-            gap
-            dist
+            VerticalDistance
+            Vertical Velocity
+            Distance to Nearest pipe
     :param data_dir: (str) Pointer to location of episodes
     :param ratio: (float) Frame ratio of every episode to be used
+    :param mode: (int) Extraction mode
+                        0: samples will be randomly selected for each episode to match the ratio
+                        1: a ratio of the episode will be selected and in those episodes all samples will be selected
+    :param max_samples: (int) Maximum number of samples to extract
     :return: states (np.array), next_states (np.array), rewards (np.array), actions (np.array)
     """
-    # Get list of all episode files
-    # for every episode file, determine number of frames and select random frames equal to the ratio
-    # Extract state, next_state, reward, action from the selected frames
-
     # Extract all Episode files
     json_files = [file for file in os.listdir(data_dir) if file.endswith('.json') and 'episode' in file]
 
@@ -179,34 +176,41 @@ def load_and_parse_dql_data(data_dir: str, ratio: float = 1.0):
     actions = np.zeros((0, 1))   # Action vector
     eog = np.zeros((0, 1))       # End of Game vector
 
-    for e_file in json_files:
+    n_episode_to_extract = int(np.floor(len(json_files) * ratio))  # Number of episode to extract
+    if mode == 0:
+        selected_files = json_files
+    else:
+        file_idx = random.sample(range(len(json_files)), n_episode_to_extract)
+        selected_files = [f for i, f in enumerate(json_files) if i in file_idx]
+
+    for e_file in selected_files:
         file_dir = os.path.join(data_dir, e_file)
-        with open(file_dir, 'r') as jf:
-            data = json.load(jf)
-            nframes = len(data["states"])
-            nframes_to_extract = int(np.floor(nframes * ratio))
-            selected_frames = random.sample(range(nframes), nframes_to_extract)
+        if max_samples is not None and max_samples < len(states):
+            break
+        with (open(file_dir, 'r') as jf):
+            data = json.load(jf)  # Load json file
+            nframes = len(data["states"])  # Total number of frames
+            nframes_to_extract = int(np.floor(nframes * ratio))  # Number of frames to extract
+            selected_frames = list(range(nframes)
+                                   ) if mode == 1 else random.sample(range(nframes), nframes_to_extract)
 
             for iFrame in selected_frames:
-                s = data["states"][iFrame]
-                # f_state = np.array([s["Y"], s["vY"], s["distanceToPipe"], s["pipeGap"], s["upperY"]])
-                vert_dist = s["Y"] - (s["upperY"] + s["pipeGap"] / 2)
-                f_state = np.array([vert_dist, s["vY"], s["distanceToPipe"]])
-                # vertDistanceToPipe = std::abs(state.p_Y - (state.p_upperY + state.p_pipeGap / 2));
-                states = np.vstack([states, f_state])
-                actions = np.vstack([actions, np.array([s["action"]])])
-                rewards = np.vstack([rewards, np.array([s["reward"]])])
+                s = data["states"][iFrame]  # State data
+                vert_dist = s["Y"] - (s["upperY"] + s["pipeGap"] / 2)  # Vertical offset from between pipe
+                f_state = np.array([vert_dist, s["vY"], s["distanceToPipe"]])  # Frame state
+                states = np.vstack([states, f_state])                          # Append to states array
+                actions = np.vstack([actions, np.array([s["action"]])])        # Append to action array
+                rewards = np.vstack([rewards, np.array([s["reward"]])])        # Reward array
 
+                # End of game
                 if iFrame >= nframes - 1:
-                    ns = data["states"][iFrame]
                     eog = np.vstack([eog, np.array([True])])
                 else:
-                    ns = data["states"][iFrame + 1]
                     eog = np.vstack([eog, np.array([False])])
-                # n_state = np.array([ns["Y"], ns["vY"], ns["aY"], ns["distanceToPipe"], ns["pipeGap"], ns["upperY"]])
                 n_vert_dist = s["next_Y"] - (s["next_upperY"] + s["next_pipeGap"] / 2)
                 n_state = np.array([n_vert_dist, s["next_vY"], s["next_distanceToPipe"]])
                 n_states = np.vstack([n_states, n_state])
+
     return {"states": states.transpose(),
             "n_states": n_states.transpose(),
             "actions": actions.transpose(),
