@@ -147,6 +147,7 @@ class ANNet:
             'optimizer': self.optimizer,
             'bias_optimizer': self.bias_optimizer
                 }
+        file_name = f'{file_name}' if file_name.endswith(".npy") else file_name
         np.save(os.path.join(save_dir, f'{file_name}.npy'), data)  # save to npy file
 
     def load_network(self, load_dir: str):
