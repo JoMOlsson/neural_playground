@@ -571,7 +571,7 @@ class ANNet:
 
 
     def train(self, x: np.ndarray, y: np.ndarray, num_iterations: int = 1000, print_every: int = 100,
-              visualize: bool = False, use_cupy: bool = False, profile: bool = False):
+              visualize: bool = False, use_cupy: bool = False, profile: bool = False, max_time: float = None):
         """ Trains the network given som input and desired output
 
         :param x: (np.ndarray) Input data
@@ -581,6 +581,7 @@ class ANNet:
         :param visualize: (bool) Visualizes the training if set to true
         :param use_cupy: (bool) Flag to select if cupy should be used or not
         :param profile: (bool) IF true, the training process with individual steps will be profiled
+        :param max_time: (float) Maximum time allowed for training
         """
         if not hasattr(self.network, 'total_number_of_training_iterations'):
             self.network.total_number_of_training_iterations = 0
@@ -604,6 +605,8 @@ class ANNet:
         forward_profile, backward_profile, print_profile, progress_profile = [], [], [], []
         ts = time.time()
         for iteration in range(num_iterations):
+            if max_time is not None and time.time() - ts > max_time:
+                break
             self.network.total_number_of_training_iterations += 1
 
             # Forward propagation
