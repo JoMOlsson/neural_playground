@@ -604,6 +604,7 @@ class ANNet:
 
         forward_profile, backward_profile, print_profile, progress_profile = [], [], [], []
         ts = time.time()
+        iteration = 0
         for iteration in range(num_iterations):
             if max_time is not None and time.time() - ts > max_time:
                 break
@@ -638,8 +639,8 @@ class ANNet:
         if profile:
             print("-----------------------------------------------------------------------")
             print(f"Total elapsed time: {te - ts}")
-            print(f"Average time per iteration: {(te - ts) / num_iterations}")
-            print(f"Total number of iterations: {num_iterations}")
+            print(f"Average time per iteration: {(te - ts) / iteration}")
+            print(f"Total number of iterations: {iteration}")
             print(f"    Average time per forward propagation: {np.mean(forward_profile)}")
             print(f"    Average time per back propagation: {np.mean(backward_profile)}")
             print(f"    Average time per print profile: {np.mean(print_profile)}")
