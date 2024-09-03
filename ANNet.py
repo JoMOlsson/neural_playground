@@ -616,7 +616,7 @@ class ANNet:
 
             # Print to console
             t1 = time.time()
-            if iteration % print_every == 0:
+            if print_every and iteration % print_every == 0:
                 self.print_progress(y, h, iteration, num_iterations)
 
             # Track progress for visualization
