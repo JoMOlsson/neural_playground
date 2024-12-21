@@ -6,6 +6,7 @@ import json
 import random
 from six.moves import urllib
 from tqdm import tqdm
+from datetime import datetime
 
 from ...ANNet import ANNet
 
@@ -155,6 +156,44 @@ def get_cube_data():
     test_output = test_data ** 3
     return  train_data, train_output, test_data, test_output
 
+def get_largest_episodes(data_dir: str, number_of_episodes: int = 5):
+    """
+
+        :param data_dir: (str) Data directory to extract episodes from
+        :param number_of_episodes: (int) Number of episodes to extract
+    """
+    episode_files = [file for file in os.listdir(data_dir) if file.endswith('.json') and 'episode' in file]
+    # Sort the files based on file size
+    sorted_episode_files = sorted(episode_files, key=lambda file: os.path.getsize(os.path.join(data_dir, file)))
+    episode_size = [os.path.getsize(os.path.join(data_dir, file)) for file in sorted_episode_files]
+
+    alpha = 0.6  # Hyperparameter for prioritization
+
+    # Calculate the priorities (based on absolute TDE errors)
+    priorities = np.abs(episode_size) ** alpha
+
+    # Normalize the priorities to get probabilities for sampling
+    probabilities = priorities / np.sum(priorities)
+
+    # Sample indices based on the probabilities
+    sampled_indices = np.random.choice(len(sorted_episode_files), size=number_of_episodes, p=probabilities)
+    random_sample = False
+    if random_sample:
+        ep_files = [sorted_episode_files[i] for i in sampled_indices]
+        ep_size = [episode_size[i] for i in sampled_indices]
+    else:
+        ep_files = sorted_episode_files[-number_of_episodes:]
+        ep_size = episode_size[-number_of_episodes:]
+    return ep_files, ep_size
+
+def get_random_episodes(data_dir: str, number_of_episodes: int = 5):
+    """
+    """
+    episode_files = [file for file in os.listdir(data_dir) if file.endswith('.json') and 'episode' in file]
+    random_indices = random.sample(range(len(episode_files)), number_of_episodes)
+    ep_file = [episode_files[i] for i in random_indices]
+    return ep_file
+
 def get_latest_episodes(data_dir: str, number_of_episodes: int = 5):
     """ Extract the latest episodes from the given data_dir. The number of episodes extracted is equal to the given
         param number_of_episodes.
@@ -162,7 +201,15 @@ def get_latest_episodes(data_dir: str, number_of_episodes: int = 5):
         :param data_dir: (str) Data directory to extract episodes from
         :param number_of_episodes: (int) Number of episodes to extract
     """
+
+    def extract_datetime(filename):
+        # Extract the date and time part of the filename
+        date_str = filename.split('_')[2] + filename.split('_')[3].split('.')[0]
+        # Convert it to a datetime object
+        return datetime.strptime(date_str, "%Y%m%d%H%M%S")
     episode_files = [file for file in os.listdir(data_dir) if file.endswith('.json') and 'episode' in file]
+    # Sort the filenames based on the extracted datetime
+    episode_files = sorted(episode_files, key=extract_datetime)
     return episode_files[-number_of_episodes:]
 
 def select_episodes_from_tde(neural_net: ANNet, data_dir: str, gamma: float = 0.9,
@@ -199,7 +246,8 @@ def select_episodes_from_tde(neural_net: ANNet, data_dir: str, gamma: float = 0.
     episode_files = [file for file in os.listdir(data_dir) if file.endswith('.json') and 'episode' in file]
     max_train_time_per_episode = max_allowed_training_time / len(episode_files)
 
-    for episode in tqdm(episode_files, desc="Calculating TDR error and train for all episodes"):
+    for episode in tqdm(episode_files, desc=f"Calculating TDR error and training all episodes, "
+                                            f"{max_train_time_per_episode} [s] training per episode"):
         # Extract data
         with (open(os.path.join(data_dir, episode), 'r') as jf):
             data = json.load(jf)  # Load json file
@@ -240,13 +288,22 @@ def select_episodes_from_tde(neural_net: ANNet, data_dir: str, gamma: float = 0.
             neural_net.train(states, q_tar, profile=False, max_time=max_train_time_per_episode, print_every=0)
 
     # Get the indices that would sort the number list in descending order
-    sorted_indices = sorted(range(len(tot_mean_tdr)), key=lambda k: tot_mean_tdr[k], reverse=True)
+    #sorted_indices = sorted(range(len(tot_mean_tdr)), key=lambda k: tot_mean_tdr[k], reverse=True)
 
-    # Sort the list based on these indices
-    episode_files_sorted = [episode_files[i] for i in sorted_indices]
-    episodes = episode_files_sorted[:number_of_episode_to_extract]
-    indices = sorted_indices[:number_of_episode_to_extract]
-    return tot_abs_tdr, tot_mean_tdr, episodes, indices
+    # ----- Select indices based on Proportional Prioritized Experience Replay (PER)
+    alpha = 0.6  # Hyperparameter for prioritization
+
+    # Calculate the priorities (based on absolute TDE errors)
+    priorities = np.abs(tot_mean_tdr) ** alpha
+
+    # Normalize the priorities to get probabilities for sampling
+    probabilities = priorities / np.sum(priorities)
+
+    # Sample indices based on the probabilities
+    sampled_indices = np.random.choice(len(tot_mean_tdr), size=number_of_episode_to_extract, p=probabilities)
+    # -----
+    ep_files = [episode_files[i] for i in sampled_indices]
+    return tot_abs_tdr, tot_mean_tdr, ep_files, sampled_indices
 
 
 
@@ -267,6 +324,11 @@ def load_and_parse_dql_data(data_dir: str, ratio: float = 1.0, mode: int = 0, ma
     :param episode_list: (list) List of episode to select from. If given, th
     :return: states (np.array), next_states (np.array), rewards (np.array), actions (np.array)
     """
+
+    # TODO - Maybee change distance to pipe to the end of pipe
+    select_every = 1
+    round_states = True
+
     # Extract all Episode files
     json_files = [file for file in os.listdir(data_dir) if file.endswith('.json') and 'episode' in file]
 
@@ -287,21 +349,30 @@ def load_and_parse_dql_data(data_dir: str, ratio: float = 1.0, mode: int = 0, ma
         file_idx = random.sample(range(len(json_files)), n_episode_to_extract)
         selected_files = [f for i, f in enumerate(json_files) if i in file_idx]
 
+    n_episodes_processed = 0
     for e_file in selected_files:
         file_dir = os.path.join(data_dir, e_file)
         if max_samples is not None and max_samples < len(states):
             break
+        n_episodes_processed += 1
         with (open(file_dir, 'r') as jf):
             data = json.load(jf)  # Load json file
             nframes = len(data["states"])  # Total number of frames
             nframes_to_extract = int(np.floor(nframes * ratio))  # Number of frames to extract
-            selected_frames = list(range(nframes)
+            selected_frames = list(range(0, nframes, select_every)
                                    ) if mode == 1 else random.sample(range(nframes), nframes_to_extract)
-
+            if nframes not in selected_frames:
+                selected_frames.append(nframes - 1)
             for iFrame in selected_frames:
                 s = data["states"][iFrame]  # State data
+
                 vert_dist = s["Y"] - (s["upperY"] + s["pipeGap"] / 2)  # Vertical offset from between pipe
-                f_state = np.array([vert_dist, s["vY"], s["distanceToPipe"]])  # Frame state
+                if round_states:
+                    vY = s["vY"]
+                    f_state = np.array([round(vert_dist / 10) * 10, round(vY), round((s["distanceToPipe"] + 100) / 10) * 10])  # Frame state
+                else:
+                    f_state = np.array([vert_dist, s["vY"], s["distanceToPipe"]])  # Frame state
+
                 states = np.vstack([states, f_state])                          # Append to states array
                 actions = np.vstack([actions, np.array([s["action"]])])        # Append to action array
                 rewards = np.vstack([rewards, np.array([s["reward"]])])        # Reward array
@@ -314,7 +385,8 @@ def load_and_parse_dql_data(data_dir: str, ratio: float = 1.0, mode: int = 0, ma
                 n_vert_dist = s["next_Y"] - (s["next_upperY"] + s["next_pipeGap"] / 2)
                 n_state = np.array([n_vert_dist, s["next_vY"], s["next_distanceToPipe"]])
                 n_states = np.vstack([n_states, n_state])
-
+        print(f"Extracted {nframes} samples from episode: {e_file}.")
+    print(f"Extracted samples from {n_episodes_processed} out of {len(selected_files)}.")
     return {"states": states.transpose(),
             "n_states": n_states.transpose(),
             "actions": actions.transpose(),
